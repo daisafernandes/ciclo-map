@@ -1,13 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { GeoJSON } from "react-leaflet";
-import { fetchCuritibaParksGeoJson } from "@/services/parksOverpass";
+import { fetchCuritibaParksGeoJson, MIN_LARGE_PARK_AREA_M2 } from "@/services/parksOverpass";
 
+/** Contraste no mapa escuro (CARTO dark): preenchimento visível sem tapar ruas. */
 const parkStyle = {
-  fillColor: "#22c55e",
-  fillOpacity: 0.32,
-  color: "#15803d",
-  weight: 1,
-  opacity: 0.85,
+  fillColor: "#4ade80",
+  fillOpacity: 0.45,
+  color: "#22c55e",
+  weight: 1.25,
+  opacity: 0.95,
 } as const;
 
 /**
@@ -15,7 +16,7 @@ const parkStyle = {
  */
 const ParksOverlay = () => {
   const { data } = useQuery({
-    queryKey: ["osm-parks-curitiba"],
+    queryKey: ["osm-parks-curitiba", "large", MIN_LARGE_PARK_AREA_M2],
     queryFn: async () => {
       try {
         return await fetchCuritibaParksGeoJson();

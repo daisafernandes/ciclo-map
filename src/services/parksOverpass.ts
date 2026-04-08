@@ -1,5 +1,9 @@
+import area from "@turf/area";
 import osmtogeojson from "osmtogeojson";
-import type { FeatureCollection, Geometry } from "geojson";
+import type { Feature, FeatureCollection, Geometry, MultiPolygon, Polygon } from "geojson";
+
+/** Área mínima em m² para contar como “parque grande” (~5 ha). Praças e ilhéus pequenos ficam de fora. */
+export const MIN_LARGE_PARK_AREA_M2 = 50_000;
 
 /** Área aproximada de Curitiba (WGS84) para consulta de parques no OSM. */
 export const CURITIBA_PARKS_BBOX = {
@@ -16,8 +20,18 @@ function overpassUrl(): string {
   return "https://overpass-api.de/api/interpreter";
 }
 
+function filterLargeParksOnly(fc: FeatureCollection<Geometry>): FeatureCollection<Geometry> {
+  const features = fc.features.filter((f) => {
+    const g = f.geometry;
+    if (g.type !== "Polygon" && g.type !== "MultiPolygon") return false;
+    return area(f as Feature<Polygon | MultiPolygon>) >= MIN_LARGE_PARK_AREA_M2;
+  });
+  return { type: "FeatureCollection", features };
+}
+
 /**
  * Parques e áreas de recreação (`leisure=park`, `landuse=recreation_ground`) via Overpass API.
+ * Depois do GeoJSON, mantém só polígonos com área ≥ {@link MIN_LARGE_PARK_AREA_M2} m².
  * Fonte: OpenStreetMap (mesma base dos tiles).
  */
 export async function fetchCuritibaParksGeoJson(): Promise<FeatureCollection<Geometry>> {
@@ -44,5 +58,5 @@ out geom;
 
   const osm: unknown = await res.json();
   const geojson = osmtogeojson(osm as Parameters<typeof osmtogeojson>[0]);
-  return geojson as FeatureCollection<Geometry>;
+  return filterLargeParksOnly(geojson as FeatureCollection<Geometry>);
 }

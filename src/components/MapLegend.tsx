@@ -33,7 +33,7 @@ const MapLegend = ({ onOpenTipologias }: MapLegendProps) => {
       <div className="border-t border-border/50 pt-2 space-y-1.5">
         <div className="flex items-center gap-2">
           <div className="w-5 h-3 rounded-sm border border-emerald-700/80 bg-emerald-500/35" />
-          <span className="text-xs text-muted-foreground">Parques (OpenStreetMap)</span>
+          <span className="text-xs text-muted-foreground">Parques grandes — OSM (≥ ~5 ha)</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-6 h-0.5 bg-muted-foreground rounded-full" />

@@ -7,6 +7,14 @@
   "trailingSlash": false,
   "rewrites": [
     {
+      "source": "/ippuc-arcgis/:path*",
+      "destination": "https://geocuritiba.ippuc.org.br/:path*"
+    },
+    {
+      "source": "/overpass-api/:path*",
+      "destination": "https://overpass-api.de/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
