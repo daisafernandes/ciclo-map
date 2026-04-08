@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bike, Menu, X, Navigation } from "lucide-react";
+import { Bike, Menu, X, Navigation, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { LatLngExpression, type LatLngTuple, type LatLngBounds } from "leaflet";
 import CycleMap from "@/components/CycleMap";
@@ -11,12 +11,20 @@ import { midpoint, neighborhoodHighlightShape } from "@/utils/mapBounds";
 import WeatherPanel from "@/components/WeatherPanel";
 import CicloviaDetail from "@/components/CicloviaDetail";
 import MapLegend from "@/components/MapLegend";
+import MapLayerFiltersPopover from "@/components/MapLayerFiltersPopover";
+import CityStatsPanel from "@/components/CityStatsPanel";
+import { type RoutePickMode } from "@/components/RoutePlannerPanel";
 import SourcesPanel from "@/components/SourcesPanel";
 import { TipologiasModal } from "@/components/shared/TipologiasModal";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { mockWeather, Ciclovia } from "@/data/ciclovias";
 import { loadCiclovias } from "@/services/cicloviasSource";
 import { fetchCuritibaWeather } from "@/services/weather";
 import { useGeolocation } from "@/hooks/useGeolocation";
+import { useFavoriteCiclovias } from "@/hooks/useFavoriteCiclovias";
+import { fetchOsrmRoute } from "@/services/routing";
+import { reverseGeocodePoint } from "@/services/reverseGeocode";
+import { formatLatLngTuple } from "@/utils/geoFormat";
 import {
   encodeTypeFilter,
   encodeSafetyFilter,
@@ -72,6 +80,7 @@ const Index = () => {
   const neighborhoodFitSeq = useRef(0);
   const [neighborhoodName, setNeighborhoodName] = useState<string | null>(null);
   const [parksVisible, setParksVisible] = useState(false);
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [typeFilter, setTypeFilter] = useState(defaultTypeFilter);
   const [safetyFilter, setSafetyFilter] = useState(defaultSafetyFilter);
   const [baseLayer, setBaseLayer] = useState<BaseLayerId>("dark");
@@ -82,14 +91,130 @@ const Index = () => {
   const { position: geoPosition, error: geoError, requestPosition, clearError: clearGeoError } =
     useGeolocation();
 
+  const { favoriteIds: favoriteIdsArr, toggleFavorite, isFavorite } = useFavoriteCiclovias();
+  const favoriteIdSet = useMemo(() => new Set(favoriteIdsArr), [favoriteIdsArr]);
+
+  useEffect(() => {
+    if (favoriteIdsArr.length === 0) setFavoritesOnly(false);
+  }, [favoriteIdsArr.length]);
+
+  const [routePointA, setRoutePointA] = useState<LatLngTuple | null>(null);
+  const [routePointB, setRoutePointB] = useState<LatLngTuple | null>(null);
+  const [routePickMode, setRoutePickMode] = useState<RoutePickMode>("none");
+  const [routeLinePositions, setRouteLinePositions] = useState<LatLngTuple[] | null>(null);
+  const [routeDistanceM, setRouteDistanceM] = useState<number | null>(null);
+  const [routeDurationS, setRouteDurationS] = useState<number | null>(null);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
+  const [routeLabelA, setRouteLabelA] = useState<string | null>(null);
+  const [routeLabelB, setRouteLabelB] = useState<string | null>(null);
+
+  const handleRouteMapClick = useCallback(
+    (p: LatLngTuple) => {
+      if (routePickMode === "origin") setRoutePointA(p);
+      else if (routePickMode === "dest") setRoutePointB(p);
+      setRoutePickMode("none");
+    },
+    [routePickMode],
+  );
+
+  const clearRoute = useCallback(() => {
+    setRoutePointA(null);
+    setRoutePointB(null);
+    setRouteLinePositions(null);
+    setRouteDistanceM(null);
+    setRouteDurationS(null);
+    setRouteError(null);
+    setRoutePickMode("none");
+    setRouteLoading(false);
+    setRouteLabelA(null);
+    setRouteLabelB(null);
+  }, []);
+
+  useEffect(() => {
+    if (!routePointA) {
+      setRouteLabelA(null);
+      return;
+    }
+    const ac = new AbortController();
+    let cancelled = false;
+    setRouteLabelA(formatLatLngTuple(routePointA));
+    reverseGeocodePoint(routePointA, ac.signal)
+      .then((t) => {
+        if (!cancelled && t) setRouteLabelA(t);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      ac.abort();
+    };
+  }, [routePointA]);
+
+  useEffect(() => {
+    if (!routePointB) {
+      setRouteLabelB(null);
+      return;
+    }
+    const ac = new AbortController();
+    let cancelled = false;
+    setRouteLabelB(formatLatLngTuple(routePointB));
+    reverseGeocodePoint(routePointB, ac.signal)
+      .then((t) => {
+        if (!cancelled && t) setRouteLabelB(t);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      ac.abort();
+    };
+  }, [routePointB]);
+
+  useEffect(() => {
+    if (!routePointA || !routePointB) {
+      setRouteLinePositions(null);
+      setRouteDistanceM(null);
+      setRouteDurationS(null);
+      setRouteError(null);
+      setRouteLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setRouteLoading(true);
+    setRouteError(null);
+    fetchOsrmRoute(routePointA, routePointB)
+      .then((r) => {
+        if (cancelled) return;
+        setRouteLinePositions(r.positions);
+        setRouteDistanceM(r.distanceMeters);
+        setRouteDurationS(r.durationSeconds);
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        setRouteLinePositions(null);
+        setRouteDistanceM(null);
+        setRouteDurationS(null);
+        setRouteError(e instanceof Error ? e.message : "Não foi possível calcular a rota.");
+      })
+      .finally(() => {
+        if (!cancelled) setRouteLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [routePointA, routePointB]);
+
   const visibleCiclovias = useMemo(() => {
     let list = ciclovias;
     if (mapHighlightIds) {
       const idSet = new Set(mapHighlightIds);
       list = list.filter((c) => idSet.has(c.id));
     }
-    return list.filter((c) => typeFilter[c.type] && safetyFilter[c.safety]);
-  }, [ciclovias, mapHighlightIds, typeFilter, safetyFilter]);
+    list = list.filter((c) => typeFilter[c.type] && safetyFilter[c.safety]);
+    if (favoritesOnly) {
+      list = list.filter((c) => favoriteIdSet.has(c.id));
+    }
+    return list;
+  }, [ciclovias, mapHighlightIds, typeFilter, safetyFilter, favoritesOnly, favoriteIdSet]);
 
   const toggleTypeFilter = useCallback((key: Ciclovia["type"]) => {
     setTypeFilter((prev) => {
@@ -261,12 +386,17 @@ const Index = () => {
           neighborhoodHighlight={neighborhoodHighlight}
           baseLayer={baseLayer}
           userLocation={userLocation}
+          routePickMode={routePickMode}
+          onRouteMapClick={handleRouteMapClick}
+          routeLinePositions={routeLinePositions}
+          routePointA={routePointA}
+          routePointB={routePointB}
         />
       </div>
 
       {/* Top Bar */}
       <div className="absolute top-0 left-0 right-0 z-10 p-4">
-        <div className="flex items-center gap-3 max-w-screen-xl mx-auto">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 max-w-screen-xl mx-auto">
           {/* Logo */}
           <motion.div
             initial={{ opacity: 0, x: -10 }}
@@ -275,14 +405,6 @@ const Index = () => {
           >
             <Bike className="w-5 h-5 text-primary shrink-0" />
             <span className="font-bold text-foreground text-sm hidden sm:inline">CicloMap CWB</span>
-            <span className="hidden h-6 w-px bg-border/60 sm:block" aria-hidden />
-            <button
-              type="button"
-              onClick={() => setTipologiasOpen(true)}
-              className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground whitespace-nowrap"
-            >
-              Tipologias
-            </button>
             <span className="hidden h-6 w-px bg-border/60 sm:block" aria-hidden />
             <button
               type="button"
@@ -295,95 +417,163 @@ const Index = () => {
             </button>
           </motion.div>
 
-          {/* Search */}
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="flex-1 max-w-md"
-          >
-            <SearchBar
-              ciclovias={ciclovias}
-              onSelectCiclovia={handleSelectCiclovia}
-              onSelectNeighborhood={handleSelectNeighborhood}
-            />
-          </motion.div>
+          <div className="flex flex-1 min-w-0 items-start sm:items-center gap-2 flex-wrap">
+            {/* Search */}
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="flex-1 min-w-[12rem] max-w-md"
+            >
+              <SearchBar
+                ciclovias={ciclovias}
+                onSelectCiclovia={handleSelectCiclovia}
+                onSelectNeighborhood={handleSelectNeighborhood}
+                favoriteIds={favoriteIdSet}
+                onToggleFavorite={toggleFavorite}
+                route={{
+                  pickMode: routePickMode,
+                  onPickModeChange: setRoutePickMode,
+                  onClear: clearRoute,
+                  labelA: routeLabelA,
+                  labelB: routeLabelB,
+                  distanceMeters: routeDistanceM,
+                  durationSeconds: routeDurationS,
+                  loading: routeLoading,
+                  error: routeError,
+                }}
+              />
+            </motion.div>
 
-          {/* Stats */}
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.12 }}
+              className="flex flex-wrap items-center gap-2 min-w-0"
+            >
+              <MapLayerFiltersPopover
+                baseLayer={baseLayer}
+                onBaseLayerChange={setBaseLayer}
+                parksVisible={parksVisible}
+                onParksVisibleChange={setParksVisible}
+                typeFilter={typeFilter}
+                onToggleType={toggleTypeFilter}
+                safetyFilter={safetyFilter}
+                onToggleSafety={toggleSafetyFilter}
+                favoritesOnly={favoritesOnly}
+                onFavoritesOnlyChange={setFavoritesOnly}
+                favoriteCount={favoriteIdsArr.length}
+              />
+            </motion.div>
+          </div>
+
+           {/* Stats da rede — clique para “Estatísticas (visíveis)” */}
           <motion.div
             initial={{ opacity: 0, x: 10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
-            className="glass-panel-sm px-4 py-2.5 hidden md:flex items-center gap-4"
+            className="shrink-0 w-full sm:w-auto"
           >
-            <div className="text-center min-w-[3.5rem]">
-              <p className="text-lg font-bold text-primary font-mono">{visibleCiclovias.length}</p>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Rotas</p>
-              {neighborhoodName && (
-                <p
-                  className="text-[9px] text-muted-foreground/90 mt-0.5 leading-tight max-w-[7rem] truncate"
-                  title={neighborhoodName}
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    "glass-panel-sm px-3 py-2 sm:px-4 sm:py-2.5 flex flex-wrap items-center justify-center sm:justify-start gap-3 sm:gap-4 w-full sm:w-auto rounded-lg",
+                    "hover:bg-secondary/25 transition-colors text-left text-foreground",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
+                  )}
+                  aria-label="Estatísticas dos trechos visíveis no mapa — toque para ver detalhes"
                 >
-                  {neighborhoodName}
-                </p>
-              )}
-            </div>
-            <div className="w-px h-8 bg-border/50" />
-            <div className="text-center">
-              <p className="text-lg font-bold text-foreground font-mono">
-                {visibleCiclovias.length
-                  ? visibleCiclovias.reduce((acc, c) => acc + c.length, 0).toFixed(0)
-                  : "—"}
-              </p>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">km total</p>
-            </div>
-            <div className="w-px h-8 bg-border/50 hidden lg:block" />
-            <div className="hidden lg:block text-center min-w-[4.5rem]">
-              <p className="text-[10px] font-medium text-primary/90 uppercase tracking-wider leading-tight">
-                {loadMode === "live"
-                  ? "IPPUC ao vivo"
-                  : loadMode === "static-fallback"
-                    ? "Fallback local"
-                    : "Referência local"}
-              </p>
-              <p className="text-[9px] text-muted-foreground mt-0.5 leading-tight">
-                {loadMode === "static-fallback"
-                  ? "URL indisponível"
-                  : loadMode === "live"
-                    ? "GeoCuritiba"
-                    : "Sem VITE_URL"}
-              </p>
-            </div>
+                  <div className="text-center min-w-[3.5rem]">
+                    <p className="text-lg font-bold text-primary font-mono">{visibleCiclovias.length}</p>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Rotas</p>
+                    {neighborhoodName && (
+                      <p
+                        className="text-[9px] text-muted-foreground/90 mt-0.5 leading-tight max-w-[7rem] truncate"
+                        title={neighborhoodName}
+                      >
+                        {neighborhoodName}
+                      </p>
+                    )}
+                  </div>
+                  <div className="w-px h-8 bg-border/50" aria-hidden />
+                  <div className="text-center">
+                    <p className="text-lg font-bold text-foreground font-mono">
+                      {visibleCiclovias.length
+                        ? visibleCiclovias.reduce((acc, c) => acc + c.length, 0).toFixed(0)
+                        : "—"}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">km total</p>
+                  </div>
+                  <div className="w-px h-8 bg-border/50 hidden lg:block" aria-hidden />
+                  <div className="hidden lg:flex lg:items-center lg:gap-1.5 text-center min-w-[4.5rem]">
+                    <div>
+                      <p className="text-[10px] font-medium text-primary/90 uppercase tracking-wider leading-tight">
+                        {loadMode === "live"
+                          ? "IPPUC ao vivo"
+                          : loadMode === "static-fallback"
+                            ? "Fallback local"
+                            : "Referência local"}
+                      </p>
+                      <p className="text-[9px] text-muted-foreground mt-0.5 leading-tight">
+                        {loadMode === "static-fallback"
+                          ? "URL indisponível"
+                          : loadMode === "live"
+                            ? "GeoCuritiba"
+                            : "Sem VITE_URL"}
+                      </p>
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden />
+                  </div>
+                  <ChevronDown className="lg:hidden w-4 h-4 text-muted-foreground shrink-0" aria-hidden />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                sideOffset={8}
+                className="w-80 z-[100] max-h-[min(75vh,28rem)] overflow-y-auto p-3 sm:p-4"
+                onOpenAutoFocus={(e) => e.preventDefault()}
+              >
+                <CityStatsPanel ciclovias={visibleCiclovias} embedded />
+              </PopoverContent>
+            </Popover>
           </motion.div>
         </div>
       </div>
 
-      {/* Left Panel - Weather + Legend */}
-      <div className="absolute bottom-4 left-4 z-10 space-y-3 w-64 hidden md:block max-h-[calc(100vh-8rem)] overflow-y-auto">
+      {/* Clima + legenda + fontes — esquerda; no mobile só o clima (legenda no menu) */}
+      <div
+        className={cn(
+          "absolute z-10 w-64 max-w-[min(16rem,calc(100vw-5rem))] left-4 space-y-3",
+          "bottom-20 md:bottom-4",
+          "max-h-[calc(100vh-8rem)] overflow-y-auto overflow-x-hidden",
+        )}
+      >
         <WeatherPanel
           weather={weatherData}
           isLoading={weatherLoading}
           isFallback={weatherFallback}
         />
-        <MapLegend
-          onOpenTipologias={() => setTipologiasOpen(true)}
-          parksVisible={parksVisible}
-          onParksVisibleChange={setParksVisible}
-          typeFilter={typeFilter}
-          onToggleType={toggleTypeFilter}
-          safetyFilter={safetyFilter}
-          onToggleSafety={toggleSafetyFilter}
-          baseLayer={baseLayer}
-          onBaseLayerChange={setBaseLayer}
-        />
-        <SourcesPanel onOpenTipologias={() => setTipologiasOpen(true)} />
+        <div className="hidden md:block space-y-3">
+          <MapLegend
+            onOpenTipologias={() => setTipologiasOpen(true)}
+            parksVisible={parksVisible}
+          />
+          <SourcesPanel onOpenTipologias={() => setTipologiasOpen(true)} />
+        </div>
       </div>
 
       {/* Right Panel - Detail */}
       <AnimatePresence>
         {selectedCiclovia && (
           <div className="absolute top-20 right-4 z-10 max-h-[calc(100vh-6rem)] overflow-y-auto">
-            <CicloviaDetail ciclovia={selectedCiclovia} onClose={handleClose} />
+            <CicloviaDetail
+              ciclovia={selectedCiclovia}
+              onClose={handleClose}
+              isFavorite={isFavorite(selectedCiclovia.id)}
+              onToggleFavorite={() => toggleFavorite(selectedCiclovia.id)}
+            />
           </div>
         )}
       </AnimatePresence>
@@ -409,24 +599,30 @@ const Index = () => {
             className="absolute bottom-0 left-0 right-0 z-20 md:hidden glass-panel rounded-t-2xl p-4 max-h-[60vh] overflow-y-auto"
           >
             <div className="space-y-3">
-              <WeatherPanel
-                weather={weatherData}
-                isLoading={weatherLoading}
-                isFallback={weatherFallback}
-              />
               {selectedCiclovia && (
-                <CicloviaDetail ciclovia={selectedCiclovia} onClose={handleClose} />
+                <CicloviaDetail
+                  ciclovia={selectedCiclovia}
+                  onClose={handleClose}
+                  isFavorite={isFavorite(selectedCiclovia.id)}
+                  onToggleFavorite={() => toggleFavorite(selectedCiclovia.id)}
+                />
               )}
               <MapLegend
                 onOpenTipologias={() => setTipologiasOpen(true)}
+                parksVisible={parksVisible}
+              />
+              <MapLayerFiltersPopover
+                baseLayer={baseLayer}
+                onBaseLayerChange={setBaseLayer}
                 parksVisible={parksVisible}
                 onParksVisibleChange={setParksVisible}
                 typeFilter={typeFilter}
                 onToggleType={toggleTypeFilter}
                 safetyFilter={safetyFilter}
                 onToggleSafety={toggleSafetyFilter}
-                baseLayer={baseLayer}
-                onBaseLayerChange={setBaseLayer}
+                favoritesOnly={favoritesOnly}
+                onFavoritesOnlyChange={setFavoritesOnly}
+                favoriteCount={favoriteIdsArr.length}
               />
               <SourcesPanel onOpenTipologias={() => setTipologiasOpen(true)} />
             </div>

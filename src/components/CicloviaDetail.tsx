@@ -1,11 +1,14 @@
-import { X, Shield, Activity, Route, MapPin, Clock } from "lucide-react";
+import { X, Shield, Activity, Route, MapPin, Clock, Download, FileJson, Star } from "lucide-react";
 import { motion } from "framer-motion";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { Ciclovia, getSafetyLabel, getTypeLabel, getTrafficLevel, mockTrafficHistory } from "@/data/ciclovias";
+import { downloadCicloviaGeoJson, downloadCicloviaGpx } from "@/utils/exportRoute";
 
 interface CicloviaDetailProps {
   ciclovia: Ciclovia;
   onClose: () => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
 }
 
 const safetyColorMap = {
@@ -20,7 +23,7 @@ const trafficColorMap = {
   high: "text-danger",
 };
 
-const CicloviaDetail = ({ ciclovia, onClose }: CicloviaDetailProps) => {
+const CicloviaDetail = ({ ciclovia, onClose, isFavorite, onToggleFavorite }: CicloviaDetailProps) => {
   const safety = getSafetyLabel(ciclovia.safety);
   const currentHour = new Date().getHours();
   const trafficLevel = getTrafficLevel(currentHour);
@@ -40,9 +43,24 @@ const CicloviaDetail = ({ ciclovia, onClose }: CicloviaDetailProps) => {
             <MapPin className="w-3 h-3" /> {ciclovia.neighborhood}
           </p>
         </div>
-        <button onClick={onClose} className="p-1 hover:bg-secondary rounded-lg transition-colors">
-          <X className="w-4 h-4 text-muted-foreground" />
-        </button>
+        <div className="flex items-center gap-0.5 shrink-0">
+          {onToggleFavorite !== undefined && (
+            <button
+              type="button"
+              onClick={onToggleFavorite}
+              className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
+              aria-label={isFavorite ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+              aria-pressed={isFavorite}
+            >
+              <Star
+                className={`w-4 h-4 ${isFavorite ? "fill-amber-400 text-amber-400" : "text-muted-foreground"}`}
+              />
+            </button>
+          )}
+          <button type="button" onClick={onClose} className="p-1 hover:bg-secondary rounded-lg transition-colors" aria-label="Fechar">
+            <X className="w-4 h-4 text-muted-foreground" />
+          </button>
+        </div>
       </div>
 
       {/* Badges */}
@@ -62,6 +80,27 @@ const CicloviaDetail = ({ ciclovia, onClose }: CicloviaDetailProps) => {
 
       {/* Description */}
       <p className="text-sm text-muted-foreground leading-relaxed">{ciclovia.description}</p>
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => downloadCicloviaGeoJson(ciclovia)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-secondary/40 px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-secondary/70"
+          aria-label="Baixar trecho em GeoJSON"
+        >
+          <FileJson className="w-3.5 h-3.5 shrink-0" />
+          GeoJSON
+        </button>
+        <button
+          type="button"
+          onClick={() => downloadCicloviaGpx(ciclovia)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-secondary/40 px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-secondary/70"
+          aria-label="Baixar trecho em GPX"
+        >
+          <Download className="w-3.5 h-3.5 shrink-0" />
+          GPX
+        </button>
+      </div>
 
       {/* Current Status */}
       <div className="glass-panel-sm p-3 space-y-2">

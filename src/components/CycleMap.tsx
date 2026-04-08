@@ -1,11 +1,21 @@
 import { useEffect, useMemo, useRef } from "react";
-import { MapContainer, TileLayer, Polyline, Polygon, Popup, CircleMarker, useMap } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  Polyline,
+  Polygon,
+  Popup,
+  CircleMarker,
+  useMap,
+  useMapEvents,
+} from "react-leaflet";
 import L, { LatLngExpression, type LatLngTuple } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Ciclovia, getSafetyLabel, getTypeLabel } from "@/data/ciclovias";
 import ParksOverlay from "@/components/ParksOverlay";
 import { flattenBoundsPoints } from "@/utils/mapBounds";
 import type { BaseLayerId } from "@/utils/mapUrlParams";
+import type { RoutePickMode } from "@/components/RoutePlannerPanel";
 
 const BASE_LAYERS: Record<
   BaseLayerId,
@@ -74,6 +84,34 @@ const FitBoundsToArea = ({
   return null;
 };
 
+const RouteMapClickHandler = ({
+  pickMode,
+  onMapClick,
+}: {
+  pickMode: RoutePickMode;
+  onMapClick: (p: LatLngTuple) => void;
+}) => {
+  const map = useMap();
+  useMapEvents({
+    click: (e) => {
+      if (pickMode === "none") return;
+      onMapClick([e.latlng.lat, e.latlng.lng]);
+    },
+  });
+  useEffect(() => {
+    const el = map.getContainer();
+    if (pickMode !== "none") {
+      el.style.cursor = "crosshair";
+    } else {
+      el.style.cursor = "";
+    }
+    return () => {
+      el.style.cursor = "";
+    };
+  }, [map, pickMode]);
+  return null;
+};
+
 const FitBoundsToCiclovias = ({ ciclovias }: { ciclovias: Ciclovia[] }) => {
   const map = useMap();
   const key = useMemo(
@@ -118,6 +156,12 @@ interface CycleMapProps {
   baseLayer?: BaseLayerId;
   /** Posição do usuário (geolocalização), exibida como marcador discreto. */
   userLocation?: LatLngTuple | null;
+  /** Modo de clique para definir origem/destino da rota OSRM. */
+  routePickMode?: RoutePickMode;
+  onRouteMapClick?: (p: LatLngTuple) => void;
+  routeLinePositions?: LatLngTuple[] | null;
+  routePointA?: LatLngTuple | null;
+  routePointB?: LatLngTuple | null;
 }
 
 const CycleMap = ({
@@ -130,6 +174,11 @@ const CycleMap = ({
   neighborhoodHighlight = null,
   baseLayer = "dark",
   userLocation = null,
+  routePickMode = "none",
+  onRouteMapClick,
+  routeLinePositions = null,
+  routePointA = null,
+  routePointB = null,
 }: CycleMapProps) => {
   const curitibaCenter: LatLngExpression = [-25.4284, -49.2733];
   const tile = BASE_LAYERS[baseLayer];
@@ -144,6 +193,9 @@ const CycleMap = ({
     >
       <TileLayer key={baseLayer} attribution={tile.attribution} url={tile.url} />
       {showParks ? <ParksOverlay /> : null}
+      {onRouteMapClick ? (
+        <RouteMapClickHandler pickMode={routePickMode} onMapClick={onRouteMapClick} />
+      ) : null}
       {userLocation ? (
         <CircleMarker
           center={userLocation}
@@ -222,6 +274,40 @@ const CycleMap = ({
           </Polyline>
         );
       })}
+      {routeLinePositions && routeLinePositions.length >= 2 && (
+        <Polyline
+          positions={routeLinePositions}
+          pathOptions={{
+            color: "#6366f1",
+            weight: 5,
+            opacity: 0.88,
+            lineCap: "round",
+            lineJoin: "round",
+          }}
+        />
+      )}
+      {routePointA && (
+        <CircleMarker
+          center={routePointA}
+          radius={8}
+          pathOptions={{ color: "#22c55e", weight: 3, fillColor: "#4ade80", fillOpacity: 0.5 }}
+        >
+          <Popup>
+            <span className="text-xs">Origem (rota)</span>
+          </Popup>
+        </CircleMarker>
+      )}
+      {routePointB && (
+        <CircleMarker
+          center={routePointB}
+          radius={8}
+          pathOptions={{ color: "#ef4444", weight: 3, fillColor: "#fca5a5", fillOpacity: 0.45 }}
+        >
+          <Popup>
+            <span className="text-xs">Destino (rota)</span>
+          </Popup>
+        </CircleMarker>
+      )}
     </MapContainer>
   );
 };

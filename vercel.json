@@ -15,6 +15,14 @@
       "destination": "https://overpass-api.de/:path*"
     },
     {
+      "source": "/osrm/:path*",
+      "destination": "https://router.project-osrm.org/:path*"
+    },
+    {
+      "source": "/nominatim/:path*",
+      "destination": "https://nominatim.openstreetmap.org/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
