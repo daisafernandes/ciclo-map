@@ -134,6 +134,50 @@
   .light-map-ui .glow-accent {
     box-shadow: 0 0 20px hsl(168 76% 32% / 0.12), 0 0 40px hsl(168 76% 32% / 0.06);
   }
+
+  /**
+   * Scrollbars discretos, alinhados às variáveis do tema (funciona em dark e light-map-ui).
+   * Firefox: scrollbar-width / scrollbar-color; WebKit: pseudo-elementos.
+   */
+  .scrollbar-themed {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.42) hsl(var(--secondary) / 0.55);
+    overscroll-behavior: contain;
+  }
+
+  .scrollbar-themed::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+
+  .scrollbar-themed::-webkit-scrollbar-track {
+    background: hsl(var(--secondary) / 0.55);
+    border-radius: 9999px;
+  }
+
+  .scrollbar-themed::-webkit-scrollbar-thumb {
+    background: linear-gradient(
+      180deg,
+      hsl(var(--muted-foreground) / 0.38),
+      hsl(var(--muted-foreground) / 0.28)
+    );
+    border-radius: 9999px;
+    border: 2px solid hsl(var(--secondary) / 0.35);
+    background-clip: padding-box;
+  }
+
+  .scrollbar-themed::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(
+      180deg,
+      hsl(var(--primary) / 0.55),
+      hsl(var(--primary) / 0.4)
+    );
+    border-color: hsl(var(--primary) / 0.25);
+  }
+
+  .scrollbar-themed::-webkit-scrollbar-corner {
+    background: transparent;
+  }
 }
 
 /* Leaflet overrides for dark theme */

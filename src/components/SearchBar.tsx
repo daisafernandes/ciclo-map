@@ -4,7 +4,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Ciclovia, getTypeLabel } from "@/data/ciclovias";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import RoutePlannerPanel, { type RoutePickMode } from "@/components/RoutePlannerPanel";
+import RouteElevationChart from "@/components/RouteElevationChart";
 import { RouteSummaryFields, routeSummaryIsActive } from "@/components/RouteSummaryStrip";
+import type { ElevationProfilePoint } from "@/services/elevation";
 import { cn } from "@/lib/utils";
 
 function normalizeSearch(s: string): string {
@@ -24,6 +26,9 @@ export interface SearchBarRouteProps {
   durationSeconds: number | null;
   loading: boolean;
   error: string | null;
+  elevationLoading: boolean;
+  elevationError: string | null;
+  elevationData: ElevationProfilePoint[] | null;
 }
 
 interface SearchBarProps {
@@ -107,7 +112,7 @@ const SearchBar = ({
     <div className="relative w-full max-w-md">
       <div
         className={cn(
-          "glass-panel flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 transition-all duration-300",
+          "glass-panel box-border flex h-12 shrink-0 items-center gap-2 sm:gap-3 px-3 sm:px-4 transition-all duration-300",
           isFocused && "glow-accent ring-1 ring-primary/30",
         )}
       >
@@ -171,6 +176,17 @@ const SearchBar = ({
                   error={route.error}
                   showPlaceholders
                 />
+                {(route.elevationLoading ||
+                  route.elevationError ||
+                  (route.elevationData?.length ?? 0) > 0) && (
+                  <div className="border-t border-border/50 pt-3">
+                    <RouteElevationChart
+                      data={route.elevationData}
+                      loading={route.elevationLoading}
+                      error={route.elevationError}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </PopoverContent>

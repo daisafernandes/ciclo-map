@@ -31,6 +31,8 @@ export default defineConfig(({ mode }) => ({
         target: "https://router.project-osrm.org",
         changeOrigin: true,
         secure: true,
+        // Mesma ideia do vercel.json: destino é a raiz do router, sem repetir o prefixo `/osrm`.
+        rewrite: (p) => p.replace(/^\/osrm/, ""),
       },
       "/nominatim": {
         target: "https://nominatim.openstreetmap.org",

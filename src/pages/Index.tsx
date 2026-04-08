@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bike, Menu, X, Navigation, ChevronDown } from "lucide-react";
+import { Bike, Menu, X, Navigation, ChevronDown, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import { LatLngExpression, type LatLngTuple, type LatLngBounds } from "leaflet";
 import CycleMap from "@/components/CycleMap";
@@ -13,6 +13,7 @@ import CicloviaDetail from "@/components/CicloviaDetail";
 import MapLegend from "@/components/MapLegend";
 import MapLayerFiltersPopover from "@/components/MapLayerFiltersPopover";
 import CityStatsPanel from "@/components/CityStatsPanel";
+import NeighborhoodRankingPanel from "@/components/NeighborhoodRankingPanel";
 import { type RoutePickMode } from "@/components/RoutePlannerPanel";
 import SourcesPanel from "@/components/SourcesPanel";
 import { TipologiasModal } from "@/components/shared/TipologiasModal";
@@ -23,6 +24,7 @@ import { fetchCuritibaWeather } from "@/services/weather";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useFavoriteCiclovias } from "@/hooks/useFavoriteCiclovias";
 import { fetchOsrmRoute } from "@/services/routing";
+import { fetchElevationProfile, type ElevationProfilePoint } from "@/services/elevation";
 import { reverseGeocodePoint } from "@/services/reverseGeocode";
 import { formatLatLngTuple } from "@/utils/geoFormat";
 import {
@@ -32,6 +34,8 @@ import {
   decodeSafetyFilter,
   parseBaseLayer,
   baseLayerToParam,
+  encodeRoutePoint,
+  decodeRoutePoint,
   type BaseLayerId,
 } from "@/utils/mapUrlParams";
 import { cn } from "@/lib/utils";
@@ -108,6 +112,9 @@ const Index = () => {
   const [routeError, setRouteError] = useState<string | null>(null);
   const [routeLabelA, setRouteLabelA] = useState<string | null>(null);
   const [routeLabelB, setRouteLabelB] = useState<string | null>(null);
+  const [elevationData, setElevationData] = useState<ElevationProfilePoint[] | null>(null);
+  const [elevationLoading, setElevationLoading] = useState(false);
+  const [elevationError, setElevationError] = useState<string | null>(null);
 
   const handleRouteMapClick = useCallback(
     (p: LatLngTuple) => {
@@ -129,6 +136,9 @@ const Index = () => {
     setRouteLoading(false);
     setRouteLabelA(null);
     setRouteLabelB(null);
+    setElevationData(null);
+    setElevationError(null);
+    setElevationLoading(false);
   }, []);
 
   useEffect(() => {
@@ -203,6 +213,45 @@ const Index = () => {
     };
   }, [routePointA, routePointB]);
 
+  useEffect(() => {
+    if (!routeLinePositions?.length) {
+      setElevationData(null);
+      setElevationError(null);
+      setElevationLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setElevationLoading(true);
+    setElevationError(null);
+    fetchElevationProfile(routeLinePositions)
+      .then((p) => {
+        if (!cancelled) setElevationData(p);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) {
+          setElevationData(null);
+          setElevationError(e instanceof Error ? e.message : "Elevação indisponível.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setElevationLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [routeLinePositions]);
+
+  /** Qualquer ponto de rota substitui seleção de trecho/bairro (alinha com URL `from`/`to`). */
+  useEffect(() => {
+    if (!routePointA && !routePointB) return;
+    setSelectedCiclovia(null);
+    setNeighborhoodName(null);
+    setNeighborhoodHighlight(null);
+    setMapHighlightIds(null);
+    setSidebarOpen(false);
+    setFlyTo(null);
+  }, [routePointA, routePointB]);
+
   const visibleCiclovias = useMemo(() => {
     let list = ciclovias;
     if (mapHighlightIds) {
@@ -232,33 +281,41 @@ const Index = () => {
     });
   }, []);
 
-  const handleSelectCiclovia = useCallback((ciclovia: Ciclovia) => {
-    setSelectedCiclovia(ciclovia);
-    setMapHighlightIds(null);
-    setNeighborhoodName(null);
-    setNeighborhoodHighlight(null);
-    setSidebarOpen(true);
-    setFlyTo(midpoint(ciclovia));
-  }, []);
-
-  const handleSelectNeighborhood = useCallback((name: string, list: Ciclovia[]) => {
-    setSelectedCiclovia(null);
-    setSidebarOpen(false);
-    setFlyTo(null);
-    setNeighborhoodName(name);
-    setMapHighlightIds(list.map((c) => c.id));
-    const shape = neighborhoodHighlightShape(list);
-    if (shape) {
-      neighborhoodFitSeq.current += 1;
-      setNeighborhoodHighlight({
-        outline: shape.outline,
-        bounds: shape.bounds,
-        key: `${name}-${neighborhoodFitSeq.current}`,
-      });
-    } else {
+  const handleSelectCiclovia = useCallback(
+    (ciclovia: Ciclovia) => {
+      clearRoute();
+      setSelectedCiclovia(ciclovia);
+      setMapHighlightIds(null);
+      setNeighborhoodName(null);
       setNeighborhoodHighlight(null);
-    }
-  }, []);
+      setSidebarOpen(true);
+      setFlyTo(midpoint(ciclovia));
+    },
+    [clearRoute],
+  );
+
+  const handleSelectNeighborhood = useCallback(
+    (name: string, list: Ciclovia[]) => {
+      clearRoute();
+      setSelectedCiclovia(null);
+      setSidebarOpen(false);
+      setFlyTo(null);
+      setNeighborhoodName(name);
+      setMapHighlightIds(list.map((c) => c.id));
+      const shape = neighborhoodHighlightShape(list);
+      if (shape) {
+        neighborhoodFitSeq.current += 1;
+        setNeighborhoodHighlight({
+          outline: shape.outline,
+          bounds: shape.bounds,
+          key: `${name}-${neighborhoodFitSeq.current}`,
+        });
+      } else {
+        setNeighborhoodHighlight(null);
+      }
+    },
+    [clearRoute],
+  );
 
   const handleClose = useCallback(() => {
     setSelectedCiclovia(null);
@@ -273,6 +330,8 @@ const Index = () => {
 
     const cicloviaId = searchParams.get("ciclovia");
     const bairroRaw = searchParams.get("bairro");
+    const from = decodeRoutePoint(searchParams.get("from"));
+    const to = decodeRoutePoint(searchParams.get("to"));
     const tipo = searchParams.get("tipo");
     const seg = searchParams.get("seg");
     const map = searchParams.get("map");
@@ -281,7 +340,10 @@ const Index = () => {
     setSafetyFilter(decodeSafetyFilter(seg));
     setBaseLayer(parseBaseLayer(map));
 
-    if (cicloviaId) {
+    if (from || to) {
+      if (from) setRoutePointA(from);
+      if (to) setRoutePointB(to);
+    } else if (cicloviaId) {
       const c = ciclovias.find((x) => x.id === cicloviaId);
       if (c) {
         setSelectedCiclovia(c);
@@ -323,8 +385,14 @@ const Index = () => {
   useEffect(() => {
     if (!urlReady) return;
     const next = new URLSearchParams();
-    if (selectedCiclovia) next.set("ciclovia", selectedCiclovia.id);
-    else if (neighborhoodName) next.set("bairro", encodeURIComponent(neighborhoodName));
+    if (routePointA || routePointB) {
+      if (routePointA) next.set("from", encodeRoutePoint(routePointA));
+      if (routePointB) next.set("to", encodeRoutePoint(routePointB));
+    } else if (selectedCiclovia) {
+      next.set("ciclovia", selectedCiclovia.id);
+    } else if (neighborhoodName) {
+      next.set("bairro", encodeURIComponent(neighborhoodName));
+    }
     const tipoEnc = encodeTypeFilter(typeFilter);
     if (tipoEnc) next.set("tipo", tipoEnc);
     const segEnc = encodeSafetyFilter(safetyFilter);
@@ -334,6 +402,8 @@ const Index = () => {
     setSearchParams(next, { replace: true });
   }, [
     urlReady,
+    routePointA,
+    routePointB,
     selectedCiclovia,
     neighborhoodName,
     typeFilter,
@@ -417,13 +487,13 @@ const Index = () => {
             </button>
           </motion.div>
 
-          <div className="flex flex-1 min-w-0 items-start sm:items-center gap-2 flex-wrap">
+          <div className="flex flex-1 min-w-0 items-center gap-2 flex-wrap">
             {/* Search */}
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="flex-1 min-w-[12rem] max-w-md"
+              className="flex min-h-12 flex-1 min-w-[12rem] max-w-md items-stretch"
             >
               <SearchBar
                 ciclovias={ciclovias}
@@ -441,6 +511,9 @@ const Index = () => {
                   durationSeconds: routeDurationS,
                   loading: routeLoading,
                   error: routeError,
+                  elevationLoading,
+                  elevationError,
+                  elevationData,
                 }}
               />
             </motion.div>
@@ -449,7 +522,7 @@ const Index = () => {
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.12 }}
-              className="flex flex-wrap items-center gap-2 min-w-0"
+              className="flex min-h-12 min-w-0 flex-wrap items-stretch gap-2"
             >
               <MapLayerFiltersPopover
                 baseLayer={baseLayer}
@@ -467,66 +540,63 @@ const Index = () => {
             </motion.div>
           </div>
 
-           {/* Stats da rede — clique para “Estatísticas (visíveis)” */}
+           {/* Stats da rede + ranking de bairros */}
           <motion.div
             initial={{ opacity: 0, x: 10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
-            className="shrink-0 w-full sm:w-auto"
+            className="shrink-0 w-full sm:w-auto flex flex-wrap items-stretch justify-end gap-2"
           >
             <Popover>
               <PopoverTrigger asChild>
                 <button
                   type="button"
+                  title={
+                    neighborhoodName
+                      ? `Trechos visíveis: ${visibleCiclovias.length}. Recorte: ${neighborhoodName}.`
+                      : undefined
+                  }
                   className={cn(
-                    "glass-panel-sm px-3 py-2 sm:px-4 sm:py-2.5 flex flex-wrap items-center justify-center sm:justify-start gap-3 sm:gap-4 w-full sm:w-auto rounded-lg",
+                    "glass-panel box-border flex h-12 w-full shrink-0 items-center justify-center gap-2 px-3 sm:w-auto sm:justify-start sm:gap-3 sm:px-4",
                     "hover:bg-secondary/25 transition-colors text-left text-foreground",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
                   )}
                   aria-label="Estatísticas dos trechos visíveis no mapa — toque para ver detalhes"
                 >
-                  <div className="text-center min-w-[3.5rem]">
-                    <p className="text-lg font-bold text-primary font-mono">{visibleCiclovias.length}</p>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Rotas</p>
-                    {neighborhoodName && (
-                      <p
-                        className="text-[9px] text-muted-foreground/90 mt-0.5 leading-tight max-w-[7rem] truncate"
-                        title={neighborhoodName}
-                      >
-                        {neighborhoodName}
-                      </p>
-                    )}
+                  <div className="flex min-w-0 flex-col items-center justify-center gap-0.5 leading-none sm:items-start">
+                    <p className="text-base font-bold tabular-nums text-primary font-mono">{visibleCiclovias.length}</p>
+                    <p className="text-[9px] uppercase tracking-wider text-muted-foreground">Rotas</p>
                   </div>
-                  <div className="w-px h-8 bg-border/50" aria-hidden />
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-foreground font-mono">
+                  <div className="h-6 w-px shrink-0 bg-border/50" aria-hidden />
+                  <div className="flex min-w-0 flex-col items-center justify-center gap-0.5 leading-none sm:items-start">
+                    <p className="text-base font-bold tabular-nums text-foreground font-mono">
                       {visibleCiclovias.length
                         ? visibleCiclovias.reduce((acc, c) => acc + c.length, 0).toFixed(0)
                         : "—"}
                     </p>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">km total</p>
+                    <p className="text-[9px] uppercase tracking-wider text-muted-foreground">km total</p>
                   </div>
-                  <div className="w-px h-8 bg-border/50 hidden lg:block" aria-hidden />
-                  <div className="hidden lg:flex lg:items-center lg:gap-1.5 text-center min-w-[4.5rem]">
-                    <div>
-                      <p className="text-[10px] font-medium text-primary/90 uppercase tracking-wider leading-tight">
-                        {loadMode === "live"
-                          ? "IPPUC ao vivo"
-                          : loadMode === "static-fallback"
-                            ? "Fallback local"
-                            : "Referência local"}
-                      </p>
-                      <p className="text-[9px] text-muted-foreground mt-0.5 leading-tight">
-                        {loadMode === "static-fallback"
-                          ? "URL indisponível"
-                          : loadMode === "live"
-                            ? "GeoCuritiba"
-                            : "Sem VITE_URL"}
-                      </p>
-                    </div>
-                    <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden />
+                  <div className="hidden h-6 w-px shrink-0 bg-border/50 lg:block" aria-hidden />
+                  <div className="hidden min-w-0 max-w-[5.5rem] flex-col justify-center gap-0 leading-tight lg:flex">
+                    <p className="text-[9px] font-medium uppercase tracking-wider text-primary/90">
+                      {loadMode === "live"
+                        ? "IPPUC ao vivo"
+                        : loadMode === "static-fallback"
+                          ? "Fallback local"
+                          : "Referência local"}
+                    </p>
+                    <p className="truncate text-[8px] text-muted-foreground">
+                      {loadMode === "static-fallback"
+                        ? "URL indisponível"
+                        : loadMode === "live"
+                          ? "GeoCuritiba"
+                          : "Sem VITE_URL"}
+                    </p>
                   </div>
-                  <ChevronDown className="lg:hidden w-4 h-4 text-muted-foreground shrink-0" aria-hidden />
+                  <div className="hidden items-center gap-1 lg:flex">
+                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                  </div>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground lg:hidden" aria-hidden />
                 </button>
               </PopoverTrigger>
               <PopoverContent
@@ -536,6 +606,30 @@ const Index = () => {
                 onOpenAutoFocus={(e) => e.preventDefault()}
               >
                 <CityStatsPanel ciclovias={visibleCiclovias} embedded />
+              </PopoverContent>
+            </Popover>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    "glass-panel box-border flex h-12 shrink-0 items-center justify-center gap-2 px-3 sm:px-4",
+                    "hover:bg-secondary/25 transition-colors text-foreground",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
+                  )}
+                  aria-label="Ranking de bairros — extensão e tipos de ciclovia"
+                >
+                  <BarChart3 className="h-5 w-5 shrink-0 text-primary" />
+                  <span className="hidden text-sm font-medium sm:inline">Bairros</span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                sideOffset={8}
+                className="w-[min(100vw-2rem,36rem)] z-[100] max-h-[min(80vh,32rem)] overflow-y-auto overflow-x-hidden p-3 sm:p-4 scrollbar-themed [scrollbar-gutter:stable]"
+                onOpenAutoFocus={(e) => e.preventDefault()}
+              >
+                <NeighborhoodRankingPanel ciclovias={ciclovias} />
               </PopoverContent>
             </Popover>
           </motion.div>

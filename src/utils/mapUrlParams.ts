@@ -1,6 +1,31 @@
+import type { LatLngTuple } from "leaflet";
 import type { Ciclovia } from "@/data/ciclovias";
 
 export type BaseLayerId = "dark" | "light" | "satellite";
+
+/** Precisão ~1 m; compacta para URLs compartilháveis. */
+const ROUTE_LL_DECIMALS = 5;
+
+/**
+ * Codifica um ponto para o parâmetro de URL `from` ou `to` (`lat,lng`).
+ */
+export function encodeRoutePoint(p: LatLngTuple): string {
+  return `${p[0].toFixed(ROUTE_LL_DECIMALS)},${p[1].toFixed(ROUTE_LL_DECIMALS)}`;
+}
+
+/**
+ * Decodifica `lat,lng` da URL. Rejeita coordenadas fora dos intervalos válidos.
+ */
+export function decodeRoutePoint(raw: string | null): LatLngTuple | null {
+  if (!raw?.trim()) return null;
+  const parts = raw.split(",").map((s) => s.trim());
+  if (parts.length !== 2) return null;
+  const lat = Number(parts[0]);
+  const lng = Number(parts[1]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+  return [lat, lng];
+}
 
 const TYPE_ORDER: Ciclovia["type"][] = ["ciclovia", "ciclofaixa", "ciclorrota"];
 const TYPE_LETTER: Record<Ciclovia["type"], string> = {

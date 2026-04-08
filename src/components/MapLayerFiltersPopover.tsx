@@ -57,8 +57,8 @@ export default function MapLayerFiltersPopover({
         <button
           type="button"
           className={cn(
-            "glass-panel inline-flex items-center gap-2 px-3 py-2.5 sm:py-3 shrink-0",
-            "text-xs font-medium text-foreground hover:bg-secondary/40 transition-colors",
+            "glass-panel box-border flex h-12 shrink-0 items-center gap-2 sm:gap-3 px-3 sm:px-4",
+            "text-sm font-medium text-foreground hover:bg-secondary/40 transition-colors",
           )}
           aria-label="Mapa base e filtros da rede"
         >
