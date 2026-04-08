@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef } from "react";
-import { MapContainer, TileLayer, Polyline, Popup, useMap } from "react-leaflet";
-import L, { LatLngExpression, LatLngTuple } from "leaflet";
+import { MapContainer, TileLayer, Polyline, Polygon, Popup, useMap } from "react-leaflet";
+import L, { LatLngExpression } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Ciclovia, getSafetyLabel, getTypeLabel } from "@/data/ciclovias";
+import { flattenBoundsPoints } from "@/utils/mapBounds";
 
 const safetyColors = {
   safe: "#22c55e",
@@ -30,18 +31,25 @@ const FlyToLocation = ({ center }: FlyToProps) => {
   return null;
 };
 
-function flattenBoundsPoints(ciclovias: Ciclovia[]): LatLngTuple[] {
-  const pts: LatLngTuple[] = [];
-  for (const c of ciclovias) {
-    for (const p of c.coordinates) {
-      if (Array.isArray(p) && p.length >= 2) {
-        const [a, b] = p;
-        if (typeof a === "number" && typeof b === "number") pts.push([a, b]);
-      }
-    }
-  }
-  return pts;
-}
+const FitBoundsToArea = ({
+  bounds,
+  boundsKey,
+}: {
+  bounds: L.LatLngBounds | null;
+  boundsKey: string | null;
+}) => {
+  const map = useMap();
+  const lastKey = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!bounds || !boundsKey) return;
+    if (lastKey.current === boundsKey) return;
+    map.fitBounds(bounds, { padding: [52, 52], maxZoom: 16, animate: true });
+    lastKey.current = boundsKey;
+  }, [bounds, boundsKey, map]);
+
+  return null;
+};
 
 const FitBoundsToCiclovias = ({ ciclovias }: { ciclovias: Ciclovia[] }) => {
   const map = useMap();
@@ -63,14 +71,34 @@ const FitBoundsToCiclovias = ({ ciclovias }: { ciclovias: Ciclovia[] }) => {
   return null;
 };
 
+function isLineHighlighted(
+  id: string,
+  selectedId: string | null,
+  highlightedIds: string[] | null,
+): boolean {
+  if (highlightedIds && highlightedIds.length > 0) return highlightedIds.includes(id);
+  return selectedId === id;
+}
+
 interface CycleMapProps {
   ciclovias: Ciclovia[];
   selectedId: string | null;
+  /** Quando definido (ex.: busca por bairro), destaca vários trechos. Se vazio, usa só `selectedId`. */
+  highlightedIds?: string[] | null;
   onSelect: (ciclovia: Ciclovia) => void;
   flyTo: LatLngExpression | null;
+  /** Contorno do bairro (fecho convexo dos trechos) + bounds para o fit. */
+  neighborhoodHighlight?: { outline: L.LatLngTuple[]; bounds: L.LatLngBounds; key: string } | null;
 }
 
-const CycleMap = ({ ciclovias, selectedId, onSelect, flyTo }: CycleMapProps) => {
+const CycleMap = ({
+  ciclovias,
+  selectedId,
+  highlightedIds = null,
+  onSelect,
+  flyTo,
+  neighborhoodHighlight = null,
+}: CycleMapProps) => {
   const curitibaCenter: LatLngExpression = [-25.4284, -49.2733];
 
   return (
@@ -87,9 +115,24 @@ const CycleMap = ({ ciclovias, selectedId, onSelect, flyTo }: CycleMapProps) => 
       />
       <FlyToLocation center={flyTo} />
       <FitBoundsToCiclovias ciclovias={ciclovias} />
+      <FitBoundsToArea bounds={neighborhoodHighlight?.bounds ?? null} boundsKey={neighborhoodHighlight?.key ?? null} />
+      {neighborhoodHighlight && neighborhoodHighlight.outline.length >= 3 && (
+        <Polygon
+          positions={neighborhoodHighlight.outline}
+          pathOptions={{
+            color: "#14b8a6",
+            weight: 2,
+            opacity: 0.9,
+            fillColor: "#14b8a6",
+            fillOpacity: 0.06,
+            lineJoin: "round",
+            lineCap: "round",
+          }}
+        />
+      )}
       {ciclovias.map((ciclovia) => {
         const style = typeStyles[ciclovia.type];
-        const isSelected = selectedId === ciclovia.id;
+        const isSelected = isLineHighlighted(ciclovia.id, selectedId, highlightedIds);
         const safety = getSafetyLabel(ciclovia.safety);
 
         return (

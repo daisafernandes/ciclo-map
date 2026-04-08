@@ -1,10 +1,11 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import { Bike, Menu, X } from "lucide-react";
-import { LatLngExpression } from "leaflet";
+import { LatLngExpression, type LatLngBounds, type LatLngTuple } from "leaflet";
 import CycleMap from "@/components/CycleMap";
 import SearchBar from "@/components/SearchBar";
+import { midpoint, neighborhoodHighlightShape } from "@/utils/mapBounds";
 import WeatherPanel from "@/components/WeatherPanel";
 import CicloviaDetail from "@/components/CicloviaDetail";
 import MapLegend from "@/components/MapLegend";
@@ -25,19 +26,47 @@ const Index = () => {
 
   const [selectedCiclovia, setSelectedCiclovia] = useState<Ciclovia | null>(null);
   const [flyTo, setFlyTo] = useState<LatLngExpression | null>(null);
+  const [mapHighlightIds, setMapHighlightIds] = useState<string[] | null>(null);
+  const [neighborhoodHighlight, setNeighborhoodHighlight] = useState<{
+    outline: LatLngTuple[];
+    bounds: LatLngBounds;
+    key: string;
+  } | null>(null);
+  const neighborhoodFitSeq = useRef(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [tipologiasOpen, setTipologiasOpen] = useState(false);
 
-  const handleSelect = useCallback((ciclovia: Ciclovia) => {
+  const handleSelectCiclovia = useCallback((ciclovia: Ciclovia) => {
     setSelectedCiclovia(ciclovia);
+    setMapHighlightIds(null);
+    setNeighborhoodHighlight(null);
     setSidebarOpen(true);
-    const midIndex = Math.floor(ciclovia.coordinates.length / 2);
-    setFlyTo(ciclovia.coordinates[midIndex]);
+    setFlyTo(midpoint(ciclovia));
+  }, []);
+
+  const handleSelectNeighborhood = useCallback((name: string, list: Ciclovia[]) => {
+    setSelectedCiclovia(null);
+    setSidebarOpen(false);
+    setFlyTo(null);
+    setMapHighlightIds(list.map((c) => c.id));
+    const shape = neighborhoodHighlightShape(list);
+    if (shape) {
+      neighborhoodFitSeq.current += 1;
+      setNeighborhoodHighlight({
+        outline: shape.outline,
+        bounds: shape.bounds,
+        key: `${name}-${neighborhoodFitSeq.current}`,
+      });
+    } else {
+      setNeighborhoodHighlight(null);
+    }
   }, []);
 
   const handleClose = useCallback(() => {
     setSelectedCiclovia(null);
     setSidebarOpen(false);
+    setMapHighlightIds(null);
+    setNeighborhoodHighlight(null);
   }, []);
 
   return (
@@ -54,8 +83,10 @@ const Index = () => {
         <CycleMap
           ciclovias={ciclovias}
           selectedId={selectedCiclovia?.id ?? null}
-          onSelect={handleSelect}
+          highlightedIds={mapHighlightIds}
+          onSelect={handleSelectCiclovia}
           flyTo={flyTo}
+          neighborhoodHighlight={neighborhoodHighlight}
         />
       </div>
 
@@ -87,7 +118,11 @@ const Index = () => {
             transition={{ delay: 0.1 }}
             className="flex-1 max-w-md"
           >
-            <SearchBar ciclovias={ciclovias} onSelect={handleSelect} />
+            <SearchBar
+              ciclovias={ciclovias}
+              onSelectCiclovia={handleSelectCiclovia}
+              onSelectNeighborhood={handleSelectNeighborhood}
+            />
           </motion.div>
 
           {/* Stats */}

@@ -18,6 +18,12 @@ export default defineConfig(({ mode }) => ({
         secure: true,
         rewrite: (p) => p.replace(/^\/ippuc-arcgis/, ""),
       },
+      "/overpass-api": {
+        target: "https://overpass-api.de",
+        changeOrigin: true,
+        secure: true,
+        rewrite: (p) => p.replace(/^\/overpass-api/, ""),
+      },
     },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
