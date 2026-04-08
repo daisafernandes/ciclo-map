@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp, ExternalLink, ImageIcon } from "lucide-react";
+import { ChevronDown, ChevronUp, ExternalLink, FileText } from "lucide-react";
 import { motion } from "framer-motion";
 import {
   GEOCURITIBA_CICLOVIAS_DASHBOARD_URL,
-  MOBILIZE_2016_CICLOVIAS_MAP_URL,
+  GEOCURITIBA_CICLOVIAS_MAP_PDF_URL,
 } from "@/lib/officialSources";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
@@ -50,16 +50,16 @@ const SourcesPanel = ({ onOpenTipologias }: SourcesPanelProps) => {
             </p>
             <p>
               <a
-                href={MOBILIZE_2016_CICLOVIAS_MAP_URL}
+                href={GEOCURITIBA_CICLOVIAS_MAP_PDF_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
               >
-                Mapa cicloviário (referência 2016)
+                Mapa cicloviário (referência 2025)
                 <ExternalLink className="h-3 w-3 shrink-0 opacity-70" />
               </a>
               <span className="block mt-1 opacity-90">
-                Imagem de apoio e legenda; a rede pode ter mudado desde então.
+                PDF oficial IPPUC (A3), edição Maio/2025 — legenda e desenho da rede municipal.
               </span>
             </p>
             {onOpenTipologias && (
@@ -73,21 +73,16 @@ const SourcesPanel = ({ onOpenTipologias }: SourcesPanelProps) => {
             )}
             <div className="overflow-hidden rounded-md border border-border/60 bg-background/40">
               <a
-                href={MOBILIZE_2016_CICLOVIAS_MAP_URL}
+                href={GEOCURITIBA_CICLOVIAS_MAP_PDF_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block"
+                className="flex items-center gap-2 px-2 py-2.5 text-[10px] uppercase tracking-wider text-muted-foreground hover:bg-secondary/30 transition-colors"
               >
-                <span className="flex items-center gap-2 px-2 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border/40">
-                  <ImageIcon className="h-3 w-3" />
-                  Mapa 2016 (miniatura)
+                <FileText className="h-3.5 w-3.5 shrink-0" />
+                <span className="text-left leading-snug normal-case font-medium text-foreground/85">
+                  Abrir PDF do mapa (A3, 2025)
                 </span>
-                <img
-                  src={MOBILIZE_2016_CICLOVIAS_MAP_URL}
-                  alt="Mapa cicloviário de Curitiba — referência 2016 (Mobilize)"
-                  className="w-full h-auto object-contain max-h-32 opacity-90"
-                  loading="lazy"
-                />
+                <ExternalLink className="h-3 w-3 shrink-0 ml-auto opacity-70" />
               </a>
             </div>
           </div>
