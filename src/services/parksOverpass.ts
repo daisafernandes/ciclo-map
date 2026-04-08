@@ -2,8 +2,8 @@ import area from "@turf/area";
 import osmtogeojson from "osmtogeojson";
 import type { Feature, FeatureCollection, Geometry, MultiPolygon, Polygon } from "geojson";
 
-/** Área mínima em m² para contar como “parque grande” (~5 ha). Praças e ilhéus pequenos ficam de fora. */
-export const MIN_LARGE_PARK_AREA_M2 = 50_000;
+/** Área mínima em m² para contar como “parque grande” (~9 ha). Praças e ilhéus pequenos ficam de fora. */
+export const MIN_LARGE_PARK_AREA_M2 = 90_000;
 
 /** Área aproximada de Curitiba (WGS84) para consulta de parques no OSM. */
 export const CURITIBA_PARKS_BBOX = {

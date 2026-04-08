@@ -83,6 +83,8 @@ function isLineHighlighted(
 
 interface CycleMapProps {
   ciclovias: Ciclovia[];
+  /** Polígonos de parques OSM (só quando true). */
+  showParks?: boolean;
   selectedId: string | null;
   /** Quando definido (ex.: busca por bairro), destaca vários trechos. Se vazio, usa só `selectedId`. */
   highlightedIds?: string[] | null;
@@ -94,6 +96,7 @@ interface CycleMapProps {
 
 const CycleMap = ({
   ciclovias,
+  showParks = false,
   selectedId,
   highlightedIds = null,
   onSelect,
@@ -114,7 +117,7 @@ const CycleMap = ({
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
       />
-      <ParksOverlay />
+      {showParks ? <ParksOverlay /> : null}
       <FlyToLocation center={flyTo} />
       <FitBoundsToCiclovias ciclovias={ciclovias} />
       <FitBoundsToArea bounds={neighborhoodHighlight?.bounds ?? null} boundsKey={neighborhoodHighlight?.key ?? null} />

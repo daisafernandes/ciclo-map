@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import { Bike, Menu, X } from "lucide-react";
@@ -14,6 +14,20 @@ import { TipologiasModal } from "@/components/shared/TipologiasModal";
 import { mockWeather, Ciclovia } from "@/data/ciclovias";
 import { loadCiclovias } from "@/services/cicloviasSource";
 
+const defaultTypeFilter: Record<Ciclovia["type"], boolean> = {
+  ciclovia: true,
+  ciclofaixa: true,
+  ciclorrota: true,
+};
+
+const defaultSafetyFilter: Record<Ciclovia["safety"], boolean> = {
+  safe: true,
+  moderate: true,
+  caution: true,
+};
+
+const emptyCiclovias: Ciclovia[] = [];
+
 const Index = () => {
   const { data, isLoading } = useQuery({
     queryKey: ["ciclovias", import.meta.env.VITE_CICLOVIAS_LIVE_URL ?? ""],
@@ -21,7 +35,7 @@ const Index = () => {
     staleTime: 1000 * 60 * 30,
   });
 
-  const ciclovias = data?.ciclovias ?? [];
+  const ciclovias = data?.ciclovias ?? emptyCiclovias;
   const loadMode = data?.mode ?? "static";
 
   const [selectedCiclovia, setSelectedCiclovia] = useState<Ciclovia | null>(null);
@@ -33,12 +47,42 @@ const Index = () => {
     key: string;
   } | null>(null);
   const neighborhoodFitSeq = useRef(0);
+  const [neighborhoodName, setNeighborhoodName] = useState<string | null>(null);
+  const [parksVisible, setParksVisible] = useState(false);
+  const [typeFilter, setTypeFilter] = useState(defaultTypeFilter);
+  const [safetyFilter, setSafetyFilter] = useState(defaultSafetyFilter);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [tipologiasOpen, setTipologiasOpen] = useState(false);
+
+  const visibleCiclovias = useMemo(() => {
+    let list = ciclovias;
+    if (mapHighlightIds) {
+      const idSet = new Set(mapHighlightIds);
+      list = list.filter((c) => idSet.has(c.id));
+    }
+    return list.filter((c) => typeFilter[c.type] && safetyFilter[c.safety]);
+  }, [ciclovias, mapHighlightIds, typeFilter, safetyFilter]);
+
+  const toggleTypeFilter = useCallback((key: Ciclovia["type"]) => {
+    setTypeFilter((prev) => {
+      const active = (Object.keys(prev) as Ciclovia["type"][]).filter((k) => prev[k]).length;
+      if (prev[key] && active === 1) return prev;
+      return { ...prev, [key]: !prev[key] };
+    });
+  }, []);
+
+  const toggleSafetyFilter = useCallback((key: Ciclovia["safety"]) => {
+    setSafetyFilter((prev) => {
+      const active = (Object.keys(prev) as Ciclovia["safety"][]).filter((k) => prev[k]).length;
+      if (prev[key] && active === 1) return prev;
+      return { ...prev, [key]: !prev[key] };
+    });
+  }, []);
 
   const handleSelectCiclovia = useCallback((ciclovia: Ciclovia) => {
     setSelectedCiclovia(ciclovia);
     setMapHighlightIds(null);
+    setNeighborhoodName(null);
     setNeighborhoodHighlight(null);
     setSidebarOpen(true);
     setFlyTo(midpoint(ciclovia));
@@ -48,6 +92,7 @@ const Index = () => {
     setSelectedCiclovia(null);
     setSidebarOpen(false);
     setFlyTo(null);
+    setNeighborhoodName(name);
     setMapHighlightIds(list.map((c) => c.id));
     const shape = neighborhoodHighlightShape(list);
     if (shape) {
@@ -66,6 +111,7 @@ const Index = () => {
     setSelectedCiclovia(null);
     setSidebarOpen(false);
     setMapHighlightIds(null);
+    setNeighborhoodName(null);
     setNeighborhoodHighlight(null);
   }, []);
 
@@ -81,7 +127,8 @@ const Index = () => {
           </div>
         )}
         <CycleMap
-          ciclovias={ciclovias}
+          ciclovias={visibleCiclovias}
+          showParks={parksVisible}
           selectedId={selectedCiclovia?.id ?? null}
           highlightedIds={mapHighlightIds}
           onSelect={handleSelectCiclovia}
@@ -132,14 +179,21 @@ const Index = () => {
             transition={{ delay: 0.2 }}
             className="glass-panel-sm px-4 py-2.5 hidden md:flex items-center gap-4"
           >
-            <div className="text-center">
-              <p className="text-lg font-bold text-primary font-mono">{ciclovias.length}</p>
+            <div className="text-center min-w-[3.5rem]">
+              <p className="text-lg font-bold text-primary font-mono">{visibleCiclovias.length}</p>
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Rotas</p>
+              {neighborhoodName && (
+                <p className="text-[9px] text-muted-foreground/90 mt-0.5 leading-tight max-w-[7rem] truncate" title={neighborhoodName}>
+                  {neighborhoodName}
+                </p>
+              )}
             </div>
             <div className="w-px h-8 bg-border/50" />
             <div className="text-center">
               <p className="text-lg font-bold text-foreground font-mono">
-                {ciclovias.length ? ciclovias.reduce((acc, c) => acc + c.length, 0).toFixed(0) : "—"}
+                {visibleCiclovias.length
+                  ? visibleCiclovias.reduce((acc, c) => acc + c.length, 0).toFixed(0)
+                  : "—"}
               </p>
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">km total</p>
             </div>
@@ -163,7 +217,15 @@ const Index = () => {
       {/* Left Panel - Weather + Legend */}
       <div className="absolute bottom-4 left-4 z-10 space-y-3 w-64 hidden md:block max-h-[calc(100vh-8rem)] overflow-y-auto">
         <WeatherPanel weather={mockWeather} />
-        <MapLegend onOpenTipologias={() => setTipologiasOpen(true)} />
+        <MapLegend
+          onOpenTipologias={() => setTipologiasOpen(true)}
+          parksVisible={parksVisible}
+          onParksVisibleChange={setParksVisible}
+          typeFilter={typeFilter}
+          onToggleType={toggleTypeFilter}
+          safetyFilter={safetyFilter}
+          onToggleSafety={toggleSafetyFilter}
+        />
         <SourcesPanel onOpenTipologias={() => setTipologiasOpen(true)} />
       </div>
 
@@ -198,7 +260,15 @@ const Index = () => {
               {selectedCiclovia && (
                 <CicloviaDetail ciclovia={selectedCiclovia} onClose={handleClose} />
               )}
-              <MapLegend onOpenTipologias={() => setTipologiasOpen(true)} />
+              <MapLegend
+                onOpenTipologias={() => setTipologiasOpen(true)}
+                parksVisible={parksVisible}
+                onParksVisibleChange={setParksVisible}
+                typeFilter={typeFilter}
+                onToggleType={toggleTypeFilter}
+                safetyFilter={safetyFilter}
+                onToggleSafety={toggleSafetyFilter}
+              />
               <SourcesPanel onOpenTipologias={() => setTipologiasOpen(true)} />
             </div>
           </motion.div>

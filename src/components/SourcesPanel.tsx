@@ -1,11 +1,17 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp, ExternalLink, FileText } from "lucide-react";
+import { ExternalLink, FileText } from "lucide-react";
 import { motion } from "framer-motion";
 import {
   GEOCURITIBA_CICLOVIAS_DASHBOARD_URL,
   GEOCURITIBA_CICLOVIAS_MAP_PDF_URL,
 } from "@/lib/officialSources";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface SourcesPanelProps {
   onOpenTipologias?: () => void;
@@ -14,26 +20,40 @@ interface SourcesPanelProps {
 const SourcesPanel = ({ onOpenTipologias }: SourcesPanelProps) => {
   const [open, setOpen] = useState(false);
 
+  const handleTipologias = () => {
+    setOpen(false);
+    onOpenTipologias?.();
+  };
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.45 }}
-      className="glass-panel-sm overflow-hidden"
-    >
-      <Collapsible open={open} onOpenChange={setOpen}>
-        <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-secondary/40 transition-colors rounded-lg">
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.45 }}
+        className="glass-panel-sm overflow-hidden"
+      >
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-secondary/40 transition-colors rounded-lg"
+        >
           <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Fontes oficiais
           </span>
-          {open ? (
-            <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-          )}
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="space-y-3 border-t border-border/50 px-3 pb-3 pt-2 text-xs text-muted-foreground leading-relaxed">
+          <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground opacity-80" aria-hidden />
+        </button>
+      </motion.div>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="flex max-h-[85vh] max-w-lg flex-col gap-0 overflow-hidden p-0 sm:rounded-xl">
+          <DialogHeader className="shrink-0 space-y-2 border-b border-border/60 px-6 pb-4 pt-2 text-left sm:pr-12">
+            <DialogTitle className="text-lg font-semibold tracking-tight">Fontes oficiais</DialogTitle>
+            <DialogDescription className="text-left text-sm leading-relaxed">
+              Links para o painel GeoCuritiba e o mapa cicloviário em PDF (IPPUC).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4 text-xs text-muted-foreground leading-relaxed space-y-3">
             <p>
               <a
                 href={GEOCURITIBA_CICLOVIAS_DASHBOARD_URL}
@@ -65,7 +85,7 @@ const SourcesPanel = ({ onOpenTipologias }: SourcesPanelProps) => {
             {onOpenTipologias && (
               <button
                 type="button"
-                onClick={onOpenTipologias}
+                onClick={handleTipologias}
                 className="inline-flex items-center gap-1 font-medium text-foreground/90 hover:text-primary hover:underline text-left"
               >
                 Tipologias (nomenclatura IPPUC)
@@ -86,9 +106,9 @@ const SourcesPanel = ({ onOpenTipologias }: SourcesPanelProps) => {
               </a>
             </div>
           </div>
-        </CollapsibleContent>
-      </Collapsible>
-    </motion.div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
