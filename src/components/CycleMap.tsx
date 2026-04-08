@@ -1,6 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { MapContainer, TileLayer, Polyline, Popup, useMap } from "react-leaflet";
-import { LatLngExpression } from "leaflet";
+import L, { LatLngExpression, LatLngTuple } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Ciclovia, getSafetyLabel, getTypeLabel } from "@/data/ciclovias";
 
@@ -30,6 +30,39 @@ const FlyToLocation = ({ center }: FlyToProps) => {
   return null;
 };
 
+function flattenBoundsPoints(ciclovias: Ciclovia[]): LatLngTuple[] {
+  const pts: LatLngTuple[] = [];
+  for (const c of ciclovias) {
+    for (const p of c.coordinates) {
+      if (Array.isArray(p) && p.length >= 2) {
+        const [a, b] = p;
+        if (typeof a === "number" && typeof b === "number") pts.push([a, b]);
+      }
+    }
+  }
+  return pts;
+}
+
+const FitBoundsToCiclovias = ({ ciclovias }: { ciclovias: Ciclovia[] }) => {
+  const map = useMap();
+  const key = useMemo(
+    () => `${ciclovias.length}-${ciclovias[0]?.id ?? ""}-${ciclovias.at(-1)?.id ?? ""}`,
+    [ciclovias],
+  );
+  const lastKey = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (ciclovias.length === 0) return;
+    if (lastKey.current === key) return;
+    const pts = flattenBoundsPoints(ciclovias);
+    if (pts.length === 0) return;
+    map.fitBounds(L.latLngBounds(pts), { padding: [40, 40], maxZoom: 14 });
+    lastKey.current = key;
+  }, [ciclovias, key, map]);
+
+  return null;
+};
+
 interface CycleMapProps {
   ciclovias: Ciclovia[];
   selectedId: string | null;
@@ -53,6 +86,7 @@ const CycleMap = ({ ciclovias, selectedId, onSelect, flyTo }: CycleMapProps) => 
         url="https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png"
       />
       <FlyToLocation center={flyTo} />
+      <FitBoundsToCiclovias ciclovias={ciclovias} />
       {ciclovias.map((ciclovia) => {
         const style = typeStyles[ciclovia.type];
         const isSelected = selectedId === ciclovia.id;
@@ -78,7 +112,7 @@ const CycleMap = ({ ciclovias, selectedId, onSelect, flyTo }: CycleMapProps) => 
                 <p className="text-xs opacity-80 mb-2">{ciclovia.street}</p>
                 <div className="flex gap-2 text-xs">
                   <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary">
-                    {getTypeLabel(ciclovia.type)}
+                    {getTypeLabel(ciclovia.type, ciclovia.tipoLabelIppuc)}
                   </span>
                   <span className={`px-2 py-0.5 rounded-full`} style={{
                     backgroundColor: safetyColors[ciclovia.safety] + "20",
@@ -88,6 +122,11 @@ const CycleMap = ({ ciclovias, selectedId, onSelect, flyTo }: CycleMapProps) => 
                   </span>
                 </div>
                 <p className="text-xs mt-2 opacity-70">{ciclovia.length} km</p>
+                <p className="text-[10px] mt-2 pt-2 border-t border-border/50 opacity-60 leading-snug">
+                  {ciclovia.dataSource === "live"
+                    ? "Dados: IPPUC / GeoCuritiba."
+                    : "Trechos de referência no app; confira o painel oficial em Fontes."}
+                </p>
               </div>
             </Popup>
           </Polyline>

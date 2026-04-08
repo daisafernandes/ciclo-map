@@ -1,5 +1,12 @@
 import { LatLngExpression } from "leaflet";
 
+/**
+ * Trechos de referência quando `VITE_CICLOVIAS_LIVE_URL` não está configurada.
+ * Nomenclatura alinhada à camada IPPUC (GeoCuritiba); geometrias são simplificadas para o mapa.
+ */
+
+export type CicloviaDataSource = "static" | "live";
+
 export interface Ciclovia {
   id: string;
   name: string;
@@ -11,6 +18,10 @@ export interface Ciclovia {
   avgTraffic: "low" | "medium" | "high";
   description: string;
   neighborhood: string;
+  /** Origem dos dados exibidos no mapa. */
+  dataSource?: CicloviaDataSource;
+  /** Rótulo do tipo na base IPPUC (camada ao vivo). */
+  tipoLabelIppuc?: string;
 }
 
 export interface WeatherData {
@@ -48,7 +59,8 @@ export const ciclovias: Ciclovia[] = [
     type: "ciclovia",
     safety: "safe",
     avgTraffic: "high",
-    description: "Principal ciclovia de Curitiba, percorre toda a extensão da Linha Verde com separação física do tráfego.",
+    description:
+      "Eixo estrutural da Linha Verde com separação física do tráfego motorizado. Trecho esquemático; rede oficial no painel GeoCuritiba (IPPUC).",
     neighborhood: "Prado Velho / Hauer",
   },
   {
@@ -66,7 +78,8 @@ export const ciclovias: Ciclovia[] = [
     type: "ciclofaixa",
     safety: "moderate",
     avgTraffic: "high",
-    description: "Ciclofaixa ao longo da Marechal Floriano, conectando bairros ao centro.",
+    description:
+      "Ciclofaixa na Marechal Floriano Peixoto (eixo sul). Ilustração aproximada; confira geometria e situação em GeoCuritiba.",
     neighborhood: "Boqueirão",
   },
   {
@@ -85,7 +98,8 @@ export const ciclovias: Ciclovia[] = [
     type: "ciclovia",
     safety: "safe",
     avgTraffic: "medium",
-    description: "Ciclovia dentro do Parque Barigui, ideal para lazer e esporte. Área arborizada e segura.",
+    description:
+      "Percurso no Parque Barigui, uso recreativo. Corresponde à lógica de parques da rede municipal (mapas IPPUC / referência cicloviária).",
     neighborhood: "Santo Inácio",
   },
   {
@@ -103,7 +117,8 @@ export const ciclovias: Ciclovia[] = [
     type: "ciclofaixa",
     safety: "moderate",
     avgTraffic: "high",
-    description: "Ciclofaixa na Sete de Setembro, trecho central bastante movimentado.",
+    description:
+      "Faixa no eixo central da Av. Sete de Setembro — área de alto fluxo. Traçado simplificado para visualização.",
     neighborhood: "Centro",
   },
   {
@@ -120,7 +135,8 @@ export const ciclovias: Ciclovia[] = [
     type: "ciclovia",
     safety: "safe",
     avgTraffic: "medium",
-    description: "Ciclovia próxima ao Centro Cívico, conectando o Bosque do Papa à região central.",
+    description:
+      "Ligação Centro Cívico / entorno do Bosque do Papa. Tipologia ciclovia conforme classificação IPPUC.",
     neighborhood: "Centro Cívico",
   },
   {
@@ -138,7 +154,8 @@ export const ciclovias: Ciclovia[] = [
     type: "ciclorrota",
     safety: "caution",
     avgTraffic: "high",
-    description: "Ciclorrota compartilhada com veículos na Av. República Argentina. Atenção redobrada.",
+    description:
+      "Ciclorrota em eixo com tráfego compartilhado (Av. República Argentina). Exige atenção; dados oficiais na base municipal.",
     neighborhood: "Água Verde",
   },
   {
@@ -155,7 +172,8 @@ export const ciclovias: Ciclovia[] = [
     type: "ciclovia",
     safety: "safe",
     avgTraffic: "low",
-    description: "Ciclovia no Parque Tingui, tranquila e arborizada. Ótima para passeios familiares.",
+    description:
+      "Parque Tingui — percurso tranquilo em área verde, alinhado ao roteiro de parques da rede cicloviária.",
     neighborhood: "São João",
   },
   {
@@ -172,7 +190,8 @@ export const ciclovias: Ciclovia[] = [
     type: "ciclofaixa",
     safety: "moderate",
     avgTraffic: "medium",
-    description: "Ciclofaixa na região do Batel, área comercial e gastronômica.",
+    description:
+      "Ciclofaixa no Batel (eixo comercial). Referência visual próxima ao mapa cicloviário histórico da cidade.",
     neighborhood: "Batel",
   },
   {
@@ -190,7 +209,8 @@ export const ciclovias: Ciclovia[] = [
     type: "ciclovia",
     safety: "moderate",
     avgTraffic: "medium",
-    description: "Ciclovia ao longo da Comendador Franco, sentido Aeroporto.",
+    description:
+      "Eixo Comendador Franco em direção ao Aeroporto. Comprimento aproximado; validar na camada GeoCuritiba.",
     neighborhood: "Jardim das Américas",
   },
   {
@@ -207,7 +227,8 @@ export const ciclovias: Ciclovia[] = [
     type: "ciclofaixa",
     safety: "caution",
     avgTraffic: "medium",
-    description: "Ciclofaixa na região do Tarumã, próxima à UFPR.",
+    description:
+      "Trecho próximo à UFPR (Tarumã). Ciclofaixa na tipologia IPPUC; geometria esquemática.",
     neighborhood: "Tarumã",
   },
   {
@@ -224,7 +245,8 @@ export const ciclovias: Ciclovia[] = [
     type: "ciclovia",
     safety: "safe",
     avgTraffic: "low",
-    description: "Ciclovia no entorno do Parque Tanguá, com vistas panorâmicas.",
+    description:
+      "Entorno do Parque Tanguá (Pilarzinho). Uso misto lazer / deslocamento conforme malha de parques.",
     neighborhood: "Pilarzinho",
   },
   {
@@ -242,7 +264,8 @@ export const ciclovias: Ciclovia[] = [
     type: "ciclovia",
     safety: "safe",
     avgTraffic: "medium",
-    description: "Ciclovia próxima à Rodoferroviária, boa infraestrutura.",
+    description:
+      "Eixo Affonso Camargo junto à Rodoferroviária. Infraestrutura de ciclovia física na classificação municipal.",
     neighborhood: "Jardim Botânico",
   },
 ];
@@ -294,7 +317,8 @@ export const getSafetyLabel = (safety: Ciclovia["safety"]) => {
   return map[safety];
 };
 
-export const getTypeLabel = (type: Ciclovia["type"]) => {
+export const getTypeLabel = (type: Ciclovia["type"], tipoLabelIppuc?: string) => {
+  if (tipoLabelIppuc) return tipoLabelIppuc;
   const map = {
     ciclovia: "Ciclovia",
     ciclofaixa: "Ciclofaixa",

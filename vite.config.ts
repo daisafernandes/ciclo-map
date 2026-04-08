@@ -11,6 +11,14 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
+    proxy: {
+      "/ippuc-arcgis": {
+        target: "https://geocuritiba.ippuc.org.br",
+        changeOrigin: true,
+        secure: true,
+        rewrite: (p) => p.replace(/^\/ippuc-arcgis/, ""),
+      },
+    },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

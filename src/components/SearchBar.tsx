@@ -71,7 +71,7 @@ const SearchBar = ({ ciclovias, onSelect }: SearchBarProps) => {
                       <p className="text-sm font-medium text-foreground truncate">{ciclovia.name}</p>
                       <p className="text-xs text-muted-foreground">{ciclovia.neighborhood} · {ciclovia.length} km</p>
                     </div>
-                    <span className="text-xs text-muted-foreground">{getTypeLabel(ciclovia.type)}</span>
+                    <span className="text-xs text-muted-foreground">{getTypeLabel(ciclovia.type, ciclovia.tipoLabelIppuc)}</span>
                   </button>
                 );
               })}

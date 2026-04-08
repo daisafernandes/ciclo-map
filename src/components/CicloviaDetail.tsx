@@ -53,7 +53,7 @@ const CicloviaDetail = ({ ciclovia, onClose }: CicloviaDetailProps) => {
         </span>
         <span className="text-xs px-2.5 py-1 rounded-full border border-primary/20 bg-primary/10 text-primary">
           <Route className="w-3 h-3 inline mr-1" />
-          {getTypeLabel(ciclovia.type)}
+          {getTypeLabel(ciclovia.type, ciclovia.tipoLabelIppuc)}
         </span>
         <span className="text-xs px-2.5 py-1 rounded-full border border-border bg-secondary text-secondary-foreground">
           {ciclovia.length} km
@@ -82,6 +82,10 @@ const CicloviaDetail = ({ ciclovia, onClose }: CicloviaDetailProps) => {
           </span>
         </div>
       </div>
+
+      <p className="text-[10px] text-muted-foreground/85 leading-relaxed border border-border/40 rounded-lg px-2.5 py-2 bg-secondary/20">
+        Movimento e gráfico abaixo são <span className="font-medium text-foreground/90">indicativos</span> (demonstração no app), não dados oficiais da IPPUC.
+      </p>
 
       {/* Traffic Chart */}
       <div>
