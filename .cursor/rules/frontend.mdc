@@ -1,0 +1,62 @@
+---
+globs: apps/frontend/**/*
+alwaysApply: true
+---
+
+# Frontend — Ciclovias
+
+React + Vite + TypeScript.
+
+## Estrutura de diretórios
+
+```
+apps/frontend/src/
+├── assets/       # Imagens, fontes, ícones
+├── components/
+│   ├── ui/       # Componentes base reutilizáveis (Button, Input...)
+│   ├── layout/   # Estruturas de layout (RootLayout...)
+│   └── shared/   # Componentes compartilhados por features
+├── contexts/     # React Contexts (AuthContext...)
+├── hooks/        # Custom hooks (useCreateUser...)
+├── pages/        # Páginas mapeadas pelas rotas
+├── services/     # Camada de comunicação com a API
+├── styles/       # CSS global
+├── types/        # Tipos e interfaces TypeScript
+└── utils/        # Funções puras auxiliares
+```
+
+## Convenções
+
+- Componentes base reutilizáveis (Button, Input, etc.) ficam em `components/ui/`.
+- Componentes de layout (wrappers de página, grids) ficam em `components/layout/`.
+- Componentes usados por múltiplas features ficam em `components/shared/`.
+- Lógica de estado e side effects encapsulados em custom hooks em `hooks/`.
+- Toda comunicação com a API passa pela camada `services/` — nunca diretamente nos componentes.
+- Tipos e interfaces TypeScript globais ficam em `types/`; tipos locais ficam no próprio arquivo.
+- Funções puras auxiliares (formatadores, validadores, etc.) ficam em `utils/`.
+- Páginas em `pages/` são mapeadas diretamente pelas rotas — sem lógica de negócio nelas.
+
+## Variáveis de ambiente
+
+Copie o exemplo antes de rodar:
+
+```bash
+cp apps/frontend/.env.example apps/frontend/.env
+```
+
+## Porta
+
+Frontend (Vite): `http://localhost:5173`
+
+## Comandos
+
+```bash
+# Rodar em modo desenvolvimento
+npm run dev --filter=@ciclovias/frontend
+
+# Build
+npm run build --filter=@ciclovias/frontend
+
+# Lint
+npm run lint --filter=@ciclovias/frontend
+```

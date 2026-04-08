@@ -1,0 +1,141 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222 47% 7%;
+    --foreground: 210 40% 92%;
+
+    --card: 222 40% 10%;
+    --card-foreground: 210 40% 92%;
+
+    --popover: 222 40% 10%;
+    --popover-foreground: 210 40% 92%;
+
+    --primary: 168 76% 40%;
+    --primary-foreground: 222 47% 7%;
+
+    --secondary: 222 30% 16%;
+    --secondary-foreground: 210 40% 85%;
+
+    --muted: 222 25% 14%;
+    --muted-foreground: 215 20% 55%;
+
+    --accent: 168 76% 40%;
+    --accent-foreground: 222 47% 7%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 222 20% 18%;
+    --input: 222 20% 18%;
+    --ring: 168 76% 40%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 222 40% 8%;
+    --sidebar-foreground: 210 40% 85%;
+    --sidebar-primary: 168 76% 40%;
+    --sidebar-primary-foreground: 222 47% 7%;
+    --sidebar-accent: 222 30% 14%;
+    --sidebar-accent-foreground: 210 40% 85%;
+    --sidebar-border: 222 20% 18%;
+    --sidebar-ring: 168 76% 40%;
+
+    /* Custom tokens */
+    --glass: 222 40% 10% / 0.7;
+    --glass-border: 222 20% 25% / 0.5;
+    --glow-primary: 168 76% 40% / 0.15;
+    --safe: 142 71% 45%;
+    --warning: 38 92% 50%;
+    --danger: 0 72% 51%;
+    --info: 210 100% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'DM Sans', sans-serif;
+  }
+}
+
+@layer utilities {
+  .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .glass-panel {
+    @apply bg-card/70 backdrop-blur-xl border border-border/50 rounded-xl shadow-2xl;
+  }
+
+  .glass-panel-sm {
+    @apply bg-card/70 backdrop-blur-lg border border-border/50 rounded-lg shadow-lg;
+  }
+
+  .glow-accent {
+    box-shadow: 0 0 20px hsl(168 76% 40% / 0.2), 0 0 60px hsl(168 76% 40% / 0.05);
+  }
+
+  .text-data {
+    font-family: 'JetBrains Mono', monospace;
+    @apply text-sm tracking-tight;
+  }
+}
+
+/* Leaflet overrides for dark theme */
+.leaflet-container {
+  background: hsl(222 47% 5%) !important;
+}
+
+.leaflet-control-zoom {
+  border: none !important;
+}
+
+.leaflet-control-zoom a {
+  background: hsl(222 40% 10% / 0.9) !important;
+  color: hsl(210 40% 85%) !important;
+  border: 1px solid hsl(222 20% 18%) !important;
+  backdrop-filter: blur(12px);
+}
+
+.leaflet-control-zoom a:hover {
+  background: hsl(222 40% 14%) !important;
+  color: hsl(168 76% 40%) !important;
+}
+
+.leaflet-control-attribution {
+  background: hsl(222 40% 10% / 0.7) !important;
+  color: hsl(215 20% 45%) !important;
+  font-size: 10px !important;
+  backdrop-filter: blur(8px);
+}
+
+.leaflet-control-attribution a {
+  color: hsl(168 76% 40%) !important;
+}
+
+.leaflet-popup-content-wrapper {
+  background: hsl(222 40% 10% / 0.95) !important;
+  color: hsl(210 40% 92%) !important;
+  border: 1px solid hsl(222 20% 18%) !important;
+  border-radius: 12px !important;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4) !important;
+}
+
+.leaflet-popup-tip {
+  background: hsl(222 40% 10% / 0.95) !important;
+  border: 1px solid hsl(222 20% 18%) !important;
+}
+
+.leaflet-popup-close-button {
+  color: hsl(215 20% 55%) !important;
+}

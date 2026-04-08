@@ -1,0 +1,91 @@
+---
+globs: apps/backend/**/*
+alwaysApply: false
+---
+
+# Backend — Ciclovias
+
+Node.js + Express + TypeScript, seguindo **Clean Architecture** e **SOLID**.
+
+## Estrutura de diretórios
+
+```
+apps/backend/src/
+├── domain/           # Entidades, interfaces, value objects (sem dependências externas)
+│   ├── entities/
+│   ├── repositories/    # Interfaces (contratos)
+│   ├── use-cases/       # Interface IUseCase
+│   └── value-objects/
+├── application/      # Casos de uso, DTOs, mappers (depende só do domain)
+│   ├── dtos/
+│   ├── mappers/
+│   └── services/        # Implementação dos use cases
+├── infrastructure/   # Implementações concretas (DB, HTTP, providers)
+│   ├── config/
+│   ├── database/
+│   │   └── repositories/
+│   ├── http/
+│   │   ├── controllers/
+│   │   ├── middlewares/
+│   │   └── routes/
+│   └── providers/
+└── shared/           # Utilitários transversais
+    ├── errors/
+    ├── types/
+    └── utils/
+```
+
+## Clean Architecture
+
+A dependência flui sempre de fora para dentro:
+
+```
+Infrastructure → Application → Domain
+```
+
+- **Domain**: zero dependências externas. Contém a lógica de negócio pura.
+- **Application**: orquestra casos de uso, depende apenas do domain.
+- **Infrastructure**: implementa as interfaces definidas no domain/application.
+
+## Princípios SOLID
+
+| Princípio | Aplicação |
+|---|---|
+| **S**RP | Cada classe tem uma única responsabilidade (`CreateUserService`, `UserMapper`, `UserController`) |
+| **O**CP | Use cases e repositórios são extensíveis via interfaces sem alterar código existente |
+| **L**SP | Implementações de repositório são substituíveis por qualquer impl. de `IUserRepository` |
+| **I**SP | Interfaces pequenas e específicas (`IUserRepository`, `IHashProvider`, `IUseCase`) |
+| **D**IP | Services dependem de abstrações (`IUserRepository`), não de implementações concretas |
+
+## Convenções
+
+- Novos casos de uso vão em `application/services/`, implementando a interface `IUseCase`.
+- Repositórios têm interface em `domain/repositories/` e implementação em `infrastructure/database/repositories/`.
+- Providers externos (hash, email, etc.) têm interface em `domain/` e implementação em `infrastructure/providers/`.
+- Controllers só orquestram HTTP: delegam lógica para services/use cases.
+- Erros de domínio ficam em `shared/errors/`.
+
+## Variáveis de ambiente
+
+Copie o exemplo antes de rodar:
+
+```bash
+cp apps/backend/.env.example apps/backend/.env
+```
+
+## Porta
+
+Backend (Express): `http://localhost:3333`
+
+## Comandos
+
+```bash
+# Rodar em modo desenvolvimento
+npm run dev --filter=@ciclovias/backend
+
+# Build
+npm run build --filter=@ciclovias/backend
+
+# Testes
+npm run test --filter=@ciclovias/backend
+```
