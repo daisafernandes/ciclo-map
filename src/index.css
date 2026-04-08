@@ -88,6 +88,52 @@
     font-family: 'JetBrains Mono', monospace;
     @apply text-sm tracking-tight;
   }
+
+  /**
+   * Mapa base claro (Carto light): texto escuro em fundos sólidos, sem vidro escuro sobre
+   * tiles claros — melhora legibilidade em clima, legenda e barra superior.
+   */
+  .light-map-ui {
+    --background: 210 40% 96%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 168 76% 32%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 94%;
+    --secondary-foreground: 222 47% 18%;
+    --muted: 210 35% 92%;
+    --muted-foreground: 215 20% 32%;
+    --accent: 168 76% 36%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 32% 88%;
+    --input: 214 32% 88%;
+    --ring: 168 76% 32%;
+    --glass: 0 0% 100% / 0.94;
+    --glass-border: 214 32% 78% / 0.85;
+    --glow-primary: 168 76% 32% / 0.12;
+    --info: 210 100% 38%;
+    --safe: 142 71% 32%;
+    --warning: 32 95% 40%;
+    --danger: 0 72% 45%;
+  }
+
+  .light-map-ui .glass-panel,
+  .light-map-ui .glass-panel-sm {
+    background-color: hsl(0 0% 100% / 0.94);
+    border-color: hsl(214 32% 82% / 0.95);
+    box-shadow:
+      0 10px 40px rgba(15, 23, 42, 0.08),
+      0 0 0 1px hsl(214 32% 90% / 0.5);
+  }
+
+  .light-map-ui .glow-accent {
+    box-shadow: 0 0 20px hsl(168 76% 32% / 0.12), 0 0 40px hsl(168 76% 32% / 0.06);
+  }
 }
 
 /* Leaflet overrides for dark theme */
@@ -138,4 +184,45 @@
 
 .leaflet-popup-close-button {
   color: hsl(215 20% 55%) !important;
+}
+
+/* Mapa claro: controles e popups alinhados ao fundo claro */
+.light-map-ui .leaflet-container {
+  background: hsl(210 40% 90%) !important;
+}
+
+.light-map-ui .leaflet-control-zoom a {
+  background: hsl(0 0% 100% / 0.95) !important;
+  color: hsl(222 47% 22%) !important;
+  border: 1px solid hsl(214 32% 85%) !important;
+}
+
+.light-map-ui .leaflet-control-zoom a:hover {
+  background: hsl(210 40% 88%) !important;
+  color: hsl(168 76% 28%) !important;
+}
+
+.light-map-ui .leaflet-control-attribution {
+  background: hsl(0 0% 100% / 0.88) !important;
+  color: hsl(215 20% 32%) !important;
+}
+
+.light-map-ui .leaflet-control-attribution a {
+  color: hsl(168 76% 30%) !important;
+}
+
+.light-map-ui .leaflet-popup-content-wrapper {
+  background: hsl(0 0% 100% / 0.96) !important;
+  color: hsl(222 47% 11%) !important;
+  border: 1px solid hsl(214 32% 88%) !important;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12) !important;
+}
+
+.light-map-ui .leaflet-popup-tip {
+  background: hsl(0 0% 100% / 0.96) !important;
+  border: 1px solid hsl(214 32% 88%) !important;
+}
+
+.light-map-ui .leaflet-popup-close-button {
+  color: hsl(215 20% 38%) !important;
 }

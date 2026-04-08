@@ -1,10 +1,32 @@
 import { useEffect, useMemo, useRef } from "react";
-import { MapContainer, TileLayer, Polyline, Polygon, Popup, useMap } from "react-leaflet";
-import L, { LatLngExpression } from "leaflet";
+import { MapContainer, TileLayer, Polyline, Polygon, Popup, CircleMarker, useMap } from "react-leaflet";
+import L, { LatLngExpression, type LatLngTuple } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Ciclovia, getSafetyLabel, getTypeLabel } from "@/data/ciclovias";
 import ParksOverlay from "@/components/ParksOverlay";
 import { flattenBoundsPoints } from "@/utils/mapBounds";
+import type { BaseLayerId } from "@/utils/mapUrlParams";
+
+const BASE_LAYERS: Record<
+  BaseLayerId,
+  { url: string; attribution: string }
+> = {
+  dark: {
+    url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  },
+  light: {
+    url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  },
+  satellite: {
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    attribution:
+      "Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community",
+  },
+};
 
 const safetyColors = {
   safe: "#22c55e",
@@ -92,6 +114,10 @@ interface CycleMapProps {
   flyTo: LatLngExpression | null;
   /** Contorno do bairro (fecho convexo dos trechos) + bounds para o fit. */
   neighborhoodHighlight?: { outline: L.LatLngTuple[]; bounds: L.LatLngBounds; key: string } | null;
+  /** Camada de mapa-base (tiles). */
+  baseLayer?: BaseLayerId;
+  /** Posição do usuário (geolocalização), exibida como marcador discreto. */
+  userLocation?: LatLngTuple | null;
 }
 
 const CycleMap = ({
@@ -102,8 +128,11 @@ const CycleMap = ({
   onSelect,
   flyTo,
   neighborhoodHighlight = null,
+  baseLayer = "dark",
+  userLocation = null,
 }: CycleMapProps) => {
   const curitibaCenter: LatLngExpression = [-25.4284, -49.2733];
+  const tile = BASE_LAYERS[baseLayer];
 
   return (
     <MapContainer
@@ -113,11 +142,24 @@ const CycleMap = ({
       zoomControl={true}
       attributionControl={true}
     >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-      />
+      <TileLayer key={baseLayer} attribution={tile.attribution} url={tile.url} />
       {showParks ? <ParksOverlay /> : null}
+      {userLocation ? (
+        <CircleMarker
+          center={userLocation}
+          radius={9}
+          pathOptions={{
+            color: "#0ea5e9",
+            weight: 3,
+            fillColor: "#38bdf8",
+            fillOpacity: 0.35,
+          }}
+        >
+          <Popup>
+            <span className="text-xs">Sua localização aproximada</span>
+          </Popup>
+        </CircleMarker>
+      ) : null}
       <FlyToLocation center={flyTo} />
       <FitBoundsToCiclovias ciclovias={ciclovias} />
       <FitBoundsToArea bounds={neighborhoodHighlight?.bounds ?? null} boundsKey={neighborhoodHighlight?.key ?? null} />

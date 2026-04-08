@@ -3,6 +3,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import type { Ciclovia } from "@/data/ciclovias";
+import type { BaseLayerId } from "@/utils/mapUrlParams";
 
 interface MapLegendProps {
   onOpenTipologias: () => void;
@@ -12,6 +13,8 @@ interface MapLegendProps {
   onToggleType: (key: Ciclovia["type"]) => void;
   safetyFilter: Record<Ciclovia["safety"], boolean>;
   onToggleSafety: (key: Ciclovia["safety"]) => void;
+  baseLayer: BaseLayerId;
+  onBaseLayerChange: (id: BaseLayerId) => void;
 }
 
 const typeRows: { key: Ciclovia["type"]; label: string }[] = [
@@ -26,6 +29,12 @@ const safetyRows: { key: Ciclovia["safety"]; label: string }[] = [
   { key: "caution", label: "Atenção" },
 ];
 
+const baseLayerOptions: { id: BaseLayerId; label: string }[] = [
+  { id: "dark", label: "Escuro" },
+  { id: "light", label: "Claro" },
+  { id: "satellite", label: "Satélite" },
+];
+
 const MapLegend = ({
   onOpenTipologias,
   parksVisible,
@@ -34,6 +43,8 @@ const MapLegend = ({
   onToggleType,
   safetyFilter,
   onToggleSafety,
+  baseLayer,
+  onBaseLayerChange,
 }: MapLegendProps) => {
   return (
     <motion.div
@@ -42,6 +53,31 @@ const MapLegend = ({
       transition={{ delay: 0.5 }}
       className="glass-panel-sm p-3 space-y-3"
     >
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Mapa base</p>
+        <div
+          className="flex rounded-md border border-border/50 bg-background/30 p-0.5 gap-0.5"
+          role="group"
+          aria-label="Alternar mapa base"
+        >
+          {baseLayerOptions.map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onBaseLayerChange(id)}
+              aria-pressed={baseLayer === id}
+              aria-label={`Mapa ${label.toLowerCase()}`}
+              className={`flex-1 rounded px-2 py-1.5 text-[11px] font-medium transition-colors ${
+                baseLayer === id
+                  ? "bg-primary/20 text-primary shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
       <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Filtros</h4>
       <div className="space-y-2">
         <p className="text-[10px] text-muted-foreground/90 uppercase tracking-wider">Tipo no mapa</p>
