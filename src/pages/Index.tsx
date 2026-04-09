@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Bike, Menu, X, Navigation, ChevronDown, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
@@ -99,6 +99,8 @@ const Index = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [tipologiasOpen, setTipologiasOpen] = useState(false);
   const [urlReady, setUrlReady] = useState(false);
+  const [mapViewResetKey, setMapViewResetKey] = useState(0);
+  const [statsPopoverAlign, setStatsPopoverAlign] = useState<"center" | "end">("center");
 
   const { position: geoPosition, error: geoError, requestPosition, clearError: clearGeoError } =
     useGeolocation();
@@ -109,6 +111,14 @@ const Index = () => {
   useEffect(() => {
     if (favoriteIdsArr.length === 0) setFavoritesOnly(false);
   }, [favoriteIdsArr.length]);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 640px)");
+    const apply = () => setStatsPopoverAlign(mq.matches ? "end" : "center");
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
 
   const [routePoints, setRoutePoints] = useState<LatLngTuple[]>([]);
   const [routeLabels, setRouteLabels] = useState<(string | null)[]>([]);
@@ -398,7 +408,20 @@ const Index = () => {
     setMapHighlightIds(null);
     setNeighborhoodName(null);
     setNeighborhoodHighlight(null);
+    setFlyTo(null);
+    setMapViewResetKey((k) => k + 1);
   }, []);
+
+  const handleClearSearch = useCallback(() => {
+    clearRoute();
+    setSelectedCiclovia(null);
+    setSidebarOpen(false);
+    setMapHighlightIds(null);
+    setNeighborhoodName(null);
+    setNeighborhoodHighlight(null);
+    setFlyTo(null);
+    setMapViewResetKey((k) => k + 1);
+  }, [clearRoute]);
 
   useEffect(() => {
     if (isLoading || urlReady) return;
@@ -565,6 +588,7 @@ const Index = () => {
           onRouteMapClick={handleRouteMapClick}
           routeLinePositions={routeLinePositions}
           routePoints={routePoints}
+          cityFitResetKey={mapViewResetKey}
         />
       </div>
 
@@ -577,9 +601,15 @@ const Index = () => {
             animate={{ opacity: 1, x: 0 }}
             className="glass-panel flex items-center gap-2.5 px-3 py-3 sm:px-4 flex-shrink-0"
           >
-            <Bike className="w-5 h-5 text-primary shrink-0" />
-            <span className="font-bold text-foreground text-sm hidden sm:inline">CicloMap CWB</span>
-            <span className="hidden h-6 w-px bg-border/60 sm:block" aria-hidden />
+            <Link
+              to="/"
+              className="flex min-w-0 items-center gap-2.5 rounded-md text-foreground outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-primary/35"
+              aria-label="CicloMap CWB — início"
+            >
+              <Bike className="w-5 h-5 shrink-0 text-primary" />
+              <span className="hidden font-bold text-sm sm:inline">CicloMap CWB</span>
+            </Link>
+            <span className="hidden h-6 w-px shrink-0 bg-border/60 sm:block" aria-hidden />
             <button
               type="button"
               onClick={() => requestPosition()}
@@ -605,6 +635,8 @@ const Index = () => {
                 onSelectNeighborhood={handleSelectNeighborhood}
                 favoriteIds={favoriteIdSet}
                 onToggleFavorite={toggleFavorite}
+                onClearSearch={handleClearSearch}
+                mapUiLight={baseLayer === "light"}
                 route={{
                   pickMode: routePickMode,
                   onPickModeChange: setRoutePickMode,
@@ -712,9 +744,12 @@ const Index = () => {
                 </button>
               </PopoverTrigger>
               <PopoverContent
-                align="end"
+                align={statsPopoverAlign}
                 sideOffset={8}
-                className="w-80 z-[100] max-h-[min(75vh,28rem)] overflow-y-auto p-3 sm:p-4"
+                className={cn(
+                  "w-[min(100vw-2rem,20rem)] sm:w-80 z-[100] max-h-[min(75vh,28rem)] overflow-y-auto p-3 sm:p-4",
+                  baseLayer === "light" && "light-map-ui",
+                )}
                 onOpenAutoFocus={(e) => e.preventDefault()}
               >
                 <CityStatsPanel ciclovias={visibleCiclovias} embedded />
@@ -738,7 +773,10 @@ const Index = () => {
               <PopoverContent
                 align="end"
                 sideOffset={8}
-                className="w-[min(100vw-2rem,36rem)] z-[100] max-h-[min(80vh,32rem)] overflow-y-auto overflow-x-hidden p-3 sm:p-4 scrollbar-themed [scrollbar-gutter:stable]"
+                className={cn(
+                  "w-[min(100vw-2rem,36rem)] z-[100] max-h-[min(80vh,32rem)] overflow-y-auto overflow-x-hidden p-3 sm:p-4 scrollbar-themed [scrollbar-gutter:stable]",
+                  baseLayer === "light" && "light-map-ui",
+                )}
                 onOpenAutoFocus={(e) => e.preventDefault()}
               >
                 <NeighborhoodRankingPanel ciclovias={ciclovias} />
@@ -751,7 +789,7 @@ const Index = () => {
       {/* Clima + legenda + fontes — esquerda; no mobile só o clima (legenda no menu) */}
       <div
         className={cn(
-          "absolute z-10 w-64 max-w-[min(16rem,calc(100vw-5rem))] left-4 space-y-3",
+          "absolute z-10 w-[min(100%,calc(100vw-2rem))] max-w-[min(16rem,calc(100vw-5rem))] sm:w-64 left-4 space-y-3",
           "bottom-20 md:bottom-4",
           "max-h-[calc(100vh-8rem)] overflow-y-auto overflow-x-hidden",
         )}
@@ -788,7 +826,7 @@ const Index = () => {
       <button
         type="button"
         onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="absolute bottom-4 right-4 z-10 md:hidden glass-panel p-3"
+        className="absolute bottom-4 right-4 z-30 md:hidden glass-panel p-3"
         aria-expanded={sidebarOpen}
         aria-label={sidebarOpen ? "Fechar painel" : "Abrir painel"}
       >
@@ -802,9 +840,20 @@ const Index = () => {
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
-            className="absolute bottom-0 left-0 right-0 z-20 md:hidden glass-panel rounded-t-2xl p-4 max-h-[60vh] overflow-y-auto"
+            className="absolute bottom-0 left-0 right-0 z-20 md:hidden glass-panel rounded-t-2xl max-h-[60vh] overflow-y-auto"
           >
-            <div className="space-y-3">
+            <div className="sticky top-0 z-10 flex items-center justify-end border-b border-border/40 bg-card/95 px-4 py-3 backdrop-blur-sm rounded-t-2xl">
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(false)}
+                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium text-foreground hover:bg-secondary/60"
+                aria-label="Fechar painel"
+              >
+                <X className="h-5 w-5 shrink-0" />
+                Fechar
+              </button>
+            </div>
+            <div className="space-y-3 p-4 pt-3">
               {selectedCiclovia && (
                 <CicloviaDetail
                   ciclovia={selectedCiclovia}

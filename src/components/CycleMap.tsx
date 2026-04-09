@@ -6,6 +6,7 @@ import {
   Polygon,
   Popup,
   CircleMarker,
+  ZoomControl,
   useMap,
   useMapEvents,
 } from "react-leaflet";
@@ -112,22 +113,33 @@ const RouteMapClickHandler = ({
   return null;
 };
 
-const FitBoundsToCiclovias = ({ ciclovias }: { ciclovias: Ciclovia[] }) => {
+const FitBoundsToCiclovias = ({
+  ciclovias,
+  resetKey = 0,
+}: {
+  ciclovias: Ciclovia[];
+  /** Incrementar para forçar novo fit (ex.: ao fechar busca / detalhe). */
+  resetKey?: number;
+}) => {
   const map = useMap();
-  const key = useMemo(
+  const contentKey = useMemo(
     () => `${ciclovias.length}-${ciclovias[0]?.id ?? ""}-${ciclovias.at(-1)?.id ?? ""}`,
     [ciclovias],
   );
-  const lastKey = useRef<string | null>(null);
+  const lastContentKey = useRef<string | null>(null);
+  const lastResetKey = useRef(resetKey);
 
   useEffect(() => {
     if (ciclovias.length === 0) return;
-    if (lastKey.current === key) return;
     const pts = flattenBoundsPoints(ciclovias);
     if (pts.length === 0) return;
+    const resetBumped = resetKey !== lastResetKey.current;
+    const listChanged = lastContentKey.current !== contentKey;
+    if (!resetBumped && !listChanged) return;
     map.fitBounds(L.latLngBounds(pts), { padding: [40, 40], maxZoom: 14 });
-    lastKey.current = key;
-  }, [ciclovias, key, map]);
+    lastContentKey.current = contentKey;
+    lastResetKey.current = resetKey;
+  }, [ciclovias, contentKey, map, resetKey]);
 
   return null;
 };
@@ -162,6 +174,8 @@ interface CycleMapProps {
   routeLinePositions?: LatLngTuple[] | null;
   /** Ordem: origem, paradas opcionais, destino. */
   routePoints?: LatLngTuple[];
+  /** Incrementar para recentrar a vista na rede visível (fechar busca / detalhe). */
+  cityFitResetKey?: number;
 }
 
 const CycleMap = ({
@@ -178,6 +192,7 @@ const CycleMap = ({
   onRouteMapClick,
   routeLinePositions = null,
   routePoints = [],
+  cityFitResetKey = 0,
 }: CycleMapProps) => {
   const curitibaCenter: LatLngExpression = [-25.4284, -49.2733];
   const tile = BASE_LAYERS[baseLayer];
@@ -187,9 +202,10 @@ const CycleMap = ({
       center={curitibaCenter}
       zoom={13}
       className="h-full w-full"
-      zoomControl={true}
+      zoomControl={false}
       attributionControl={true}
     >
+      <ZoomControl position="bottomright" />
       <TileLayer key={baseLayer} attribution={tile.attribution} url={tile.url} />
       {showParks ? <ParksOverlay /> : null}
       {onRouteMapClick ? (
@@ -212,7 +228,7 @@ const CycleMap = ({
         </CircleMarker>
       ) : null}
       <FlyToLocation center={flyTo} />
-      <FitBoundsToCiclovias ciclovias={ciclovias} />
+      <FitBoundsToCiclovias ciclovias={ciclovias} resetKey={cityFitResetKey} />
       <FitBoundsToArea bounds={neighborhoodHighlight?.bounds ?? null} boundsKey={neighborhoodHighlight?.key ?? null} />
       {neighborhoodHighlight && neighborhoodHighlight.outline.length >= 3 && (
         <Polygon

@@ -189,6 +189,13 @@
   border: none !important;
 }
 
+/* Evita sobrepor o FAB do menu mobile (canto inferior direito) */
+@media (max-width: 767px) {
+  .leaflet-bottom.leaflet-right .leaflet-control-zoom {
+    margin-bottom: 4.5rem;
+  }
+}
+
 .leaflet-control-zoom a {
   background: hsl(222 40% 10% / 0.9) !important;
   color: hsl(210 40% 85%) !important;

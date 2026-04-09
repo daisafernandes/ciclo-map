@@ -21,14 +21,18 @@ const WeatherPanel = ({ weather, isLoading = false, isFallback = false }: Weathe
   const alerts = useMemo(() => getCyclingWeatherAlerts(weather), [weather]);
 
   return (
-    <div className="glass-panel-sm p-4 animate-slide-up">
-      <div className="flex items-center justify-between mb-3 gap-2">
-        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Clima agora</h3>
-        <span className="text-xs text-muted-foreground shrink-0">{weather.updatedAt}</span>
+    <div className="glass-panel-sm p-3 md:p-4 animate-slide-up">
+      <div className="flex items-center justify-between mb-2 md:mb-3 gap-2">
+        <h3 className="text-[10px] md:text-xs font-medium text-muted-foreground uppercase tracking-wider">Clima agora</h3>
+        <span className="text-[10px] md:text-xs text-muted-foreground shrink-0">{weather.updatedAt}</span>
       </div>
 
       {!isLoading && alerts.length > 0 && (
-        <ul className="mb-3 space-y-1.5" role="list" aria-label="Alertas para ciclistas">
+        <ul
+          className="mb-2 md:mb-3 space-y-1.5 max-h-24 md:max-h-none overflow-y-auto md:overflow-visible"
+          role="list"
+          aria-label="Alertas para ciclistas"
+        >
           {alerts.map((a, i) => (
             <li
               key={`${i}-${a.message.slice(0, 24)}`}
@@ -55,47 +59,47 @@ const WeatherPanel = ({ weather, isLoading = false, isFallback = false }: Weathe
       )}
 
       {isLoading ? (
-        <div className="flex items-center justify-center gap-2 py-8 text-muted-foreground">
+        <div className="flex items-center justify-center gap-2 py-6 md:py-8 text-muted-foreground">
           <Loader2 className="w-5 h-5 animate-spin" aria-hidden />
           <span className="text-xs">Carregando clima…</span>
         </div>
       ) : (
         <>
-      <div className="flex items-center gap-3 mb-4">
-        <Cloud className="w-8 h-8 text-info shrink-0" />
+      <div className="flex items-center gap-2 md:gap-3 mb-3 md:mb-4">
+        <Cloud className="w-6 h-6 md:w-8 md:h-8 text-info shrink-0" />
         <div>
-          <p className="text-2xl font-bold text-foreground font-mono">{weather.temperature}°C</p>
-          <p className="text-xs text-muted-foreground">{weather.condition}</p>
+          <p className="text-xl md:text-2xl font-bold text-foreground font-mono">{weather.temperature}°C</p>
+          <p className="text-[11px] md:text-xs text-muted-foreground">{weather.condition}</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="flex items-center gap-2">
-          <Thermometer className="w-3.5 h-3.5 text-warning" />
-          <div>
-            <p className="text-xs text-muted-foreground">Sensação</p>
-            <p className="text-sm font-mono text-foreground">{weather.feelsLike}°C</p>
+      <div className="grid grid-cols-2 gap-2 md:gap-3">
+        <div className="flex items-center gap-1.5 md:gap-2">
+          <Thermometer className="w-3 h-3 md:w-3.5 md:h-3.5 text-warning shrink-0" />
+          <div className="min-w-0">
+            <p className="text-[10px] md:text-xs text-muted-foreground">Sensação</p>
+            <p className="text-[11px] md:text-sm font-mono text-foreground">{weather.feelsLike}°C</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Wind className="w-3.5 h-3.5 text-info" />
-          <div>
-            <p className="text-xs text-muted-foreground">Vento</p>
-            <p className="text-sm font-mono text-foreground">{weather.windSpeed} km/h {weather.windDirection}</p>
+        <div className="flex items-center gap-1.5 md:gap-2">
+          <Wind className="w-3 h-3 md:w-3.5 md:h-3.5 text-info shrink-0" />
+          <div className="min-w-0">
+            <p className="text-[10px] md:text-xs text-muted-foreground">Vento</p>
+            <p className="text-[11px] md:text-sm font-mono text-foreground truncate">{weather.windSpeed} km/h {weather.windDirection}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Droplets className="w-3.5 h-3.5 text-primary" />
-          <div>
-            <p className="text-xs text-muted-foreground">Chuva</p>
-            <p className="text-sm font-mono text-foreground">{weather.rain} mm</p>
+        <div className="flex items-center gap-1.5 md:gap-2">
+          <Droplets className="w-3 h-3 md:w-3.5 md:h-3.5 text-primary shrink-0" />
+          <div className="min-w-0">
+            <p className="text-[10px] md:text-xs text-muted-foreground">Chuva</p>
+            <p className="text-[11px] md:text-sm font-mono text-foreground">{weather.rain} mm</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Eye className="w-3.5 h-3.5 text-muted-foreground" />
-          <div>
-            <p className="text-xs text-muted-foreground">Umidade</p>
-            <p className="text-sm font-mono text-foreground">{weather.humidity}%</p>
+        <div className="flex items-center gap-1.5 md:gap-2">
+          <Eye className="w-3 h-3 md:w-3.5 md:h-3.5 text-muted-foreground shrink-0" />
+          <div className="min-w-0">
+            <p className="text-[10px] md:text-xs text-muted-foreground">Umidade</p>
+            <p className="text-[11px] md:text-sm font-mono text-foreground">{weather.humidity}%</p>
           </div>
         </div>
       </div>

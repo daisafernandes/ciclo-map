@@ -1,11 +1,13 @@
-import { useState, useRef, useMemo } from "react";
-import { Search, X, MapPin, Building2, Star, Navigation } from "lucide-react";
+import { useState, useRef, useMemo, useEffect } from "react";
+import { Search, X, MapPin, Building2, Star, Route, MessageCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useLocation } from "react-router-dom";
 import { Ciclovia, getTypeLabel } from "@/data/ciclovias";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import RoutePlannerPanel, { type RoutePickMode } from "@/components/RoutePlannerPanel";
 import type { RouteNetworkMode } from "@/utils/mapUrlParams";
 import type { ParkNearRouteSuggestion } from "@/utils/parksNearRoute";
+import { buildWhatsAppShareUrl, formatRouteShareMessage } from "@/utils/routeShare";
 import RouteElevationChart from "@/components/RouteElevationChart";
 import { RouteSummaryFields, routeSummaryIsActive } from "@/components/RouteSummaryStrip";
 import type { ElevationProfilePoint } from "@/services/elevation";
@@ -46,6 +48,10 @@ interface SearchBarProps {
   onSelectNeighborhood: (neighborhoodName: string, cicloviasInNeighborhood: Ciclovia[]) => void;
   favoriteIds: Set<string>;
   onToggleFavorite: (id: string) => void;
+  /** Ao limpar o campo de busca: resetar mapa/seleção (página principal). */
+  onClearSearch?: () => void;
+  /** Alinhar tema do popover ao mapa claro (portais ficam fora do `.light-map-ui`). */
+  mapUiLight?: boolean;
   route: SearchBarRouteProps;
 }
 
@@ -55,12 +61,23 @@ const SearchBar = ({
   onSelectNeighborhood,
   favoriteIds,
   onToggleFavorite,
+  onClearSearch,
+  mapUiLight = false,
   route,
 }: SearchBarProps) => {
+  const location = useLocation();
   const [query, setQuery] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const [routeOpen, setRouteOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const prevPickMode = useRef<RoutePickMode>(route.pickMode);
+
+  useEffect(() => {
+    if (prevPickMode.current !== "none" && route.pickMode === "none") {
+      setRouteOpen(false);
+    }
+    prevPickMode.current = route.pickMode;
+  }, [route.pickMode]);
 
   const routeActive = routeSummaryIsActive({
     labelA: route.labelA,
@@ -104,6 +121,11 @@ const SearchBar = ({
   }, [ciclovias, query]);
 
   const hasResults = neighborhoodRows.length > 0 || cicloviaRows.length > 0;
+  const canShareRoute =
+    route.distanceMeters != null &&
+    route.durationSeconds != null &&
+    !route.loading &&
+    route.error == null;
 
   const handleSelectCiclovia = (ciclovia: Ciclovia) => {
     onSelectCiclovia(ciclovia);
@@ -115,6 +137,25 @@ const SearchBar = ({
     onSelectNeighborhood(name, list);
     setQuery(name);
     setIsFocused(false);
+  };
+
+  const handleShareOnWhatsApp = () => {
+    if (!canShareRoute || route.distanceMeters == null || route.durationSeconds == null) {
+      return;
+    }
+
+    const absoluteUrl = `${window.location.origin}${location.pathname}${location.search}`;
+    const message = formatRouteShareMessage({
+      labelA: route.labelA,
+      labelB: route.labelB,
+      waypointCount: route.waypointCount,
+      distanceMeters: route.distanceMeters,
+      durationSeconds: route.durationSeconds,
+      routeNetworkMode: route.routeNetworkMode,
+      absoluteUrl,
+    });
+    const shareUrl = buildWhatsAppShareUrl(message);
+    window.open(shareUrl, "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -137,7 +178,15 @@ const SearchBar = ({
           className="flex-1 min-w-0 bg-transparent text-foreground text-sm placeholder:text-muted-foreground outline-none"
         />
         {query && (
-          <button type="button" onClick={() => { setQuery(""); inputRef.current?.focus(); }}>
+          <button
+            type="button"
+            onClick={() => {
+              setQuery("");
+              onClearSearch?.();
+              inputRef.current?.focus();
+            }}
+            aria-label="Limpar busca"
+          >
             <X className="w-4 h-4 text-muted-foreground hover:text-foreground transition-colors" />
           </button>
         )}
@@ -146,7 +195,7 @@ const SearchBar = ({
             <button
               type="button"
               className={cn(
-                "inline-flex items-center gap-1.5 shrink-0 rounded-md border px-2 sm:px-2.5 py-1.5 text-xs font-medium transition-colors",
+                "inline-flex items-center justify-center gap-1 shrink-0 rounded-md border px-2 py-1.5 text-xs font-medium transition-colors",
                 routeActive
                   ? "border-primary/50 bg-primary/10 text-primary"
                   : "border-border/60 bg-background/30 text-muted-foreground hover:bg-secondary/50 hover:text-foreground",
@@ -154,8 +203,8 @@ const SearchBar = ({
               aria-label="Rota A → B — abrir painel"
               aria-expanded={routeOpen}
             >
-              <Navigation className="w-4 h-4 shrink-0" />
-              <span>Rota</span>
+              <Route className="w-4 h-4 shrink-0" aria-hidden />
+              <span className="sr-only">Rota</span>
               {routeActive ? (
                 <span className="w-2 h-2 rounded-full bg-primary shrink-0" aria-hidden />
               ) : null}
@@ -164,7 +213,7 @@ const SearchBar = ({
           <PopoverContent
             align="end"
             sideOffset={8}
-            className="w-80 z-[100] p-3 sm:p-4"
+            className={cn("w-80 z-[100] p-3 sm:p-4", mapUiLight && "light-map-ui")}
             onOpenAutoFocus={(e) => e.preventDefault()}
           >
             <div className="space-y-4">
@@ -192,6 +241,17 @@ const SearchBar = ({
                   waypointCount={route.waypointCount}
                   showPlaceholders
                 />
+                {canShareRoute && (
+                  <button
+                    type="button"
+                    onClick={handleShareOnWhatsApp}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-background/30 px-2.5 py-1.5 text-[11px] font-medium text-foreground transition-colors hover:bg-secondary/50"
+                    aria-label="Compartilhar rota no WhatsApp com link para o mapa"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5 shrink-0" />
+                    WhatsApp
+                  </button>
+                )}
                 {route.parkSuggestions.length > 0 && (
                   <div className="rounded-md border border-border/50 bg-secondary/15 px-2 py-2">
                     <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">

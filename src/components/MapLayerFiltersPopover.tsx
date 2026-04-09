@@ -66,7 +66,11 @@ export default function MapLayerFiltersPopover({
           <span className="hidden sm:inline">Mapa e filtros</span>
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-80 z-[100]" sideOffset={8}>
+      <PopoverContent
+        align="start"
+        sideOffset={8}
+        className={cn("w-80 z-[100]", baseLayer === "light" && "light-map-ui")}
+      >
         <div className="space-y-3">
           <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Mapa base</p>
