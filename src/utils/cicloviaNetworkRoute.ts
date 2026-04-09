@@ -3,11 +3,19 @@ import type { LatLngExpression } from "leaflet";
 import type { Ciclovia } from "@/data/ciclovias";
 import { haversineM, projectPointOnChordSegment } from "@/utils/geoDistance";
 
+/** Trecho reta entre o ponto do usuário e o encosto na rede (visualização tracejada). */
+export interface OffNetworkSegment {
+  a: LatLngTuple;
+  b: LatLngTuple;
+}
+
 export interface CicloviaNetworkRouteResult {
   positions: LatLngTuple[];
   distanceMeters: number;
   /** Estimativa a ~15 km/h sobre a rede (sem semáforos). */
   durationSeconds: number;
+  /** Conectores fora da rede (usuário → snap), para desenho tracejado quando o encosto está além do limiar. */
+  offNetworkSegments: OffNetworkSegment[];
 }
 
 function toTuple(c: LatLngExpression): LatLngTuple {
@@ -215,8 +223,7 @@ function computeSnap(
   baseNodes: readonly LatLngTuple[],
   vertexCount: number,
   segments: readonly Segment[],
-  maxM: number,
-): Snap {
+): { snap: Snap; distanceM: number } {
   let bestD = Infinity;
   let best: Snap | null = null;
 
@@ -238,12 +245,17 @@ function computeSnap(
     }
   }
 
-  if (!best || bestD > maxM) {
-    throw new Error(
-      "Ponto longe da rede IPPUC. Aproxime origem/destino (ou paradas) aos trechos desenhados no mapa.",
-    );
+  if (!best) {
+    throw new Error("Não foi possível encostar o ponto à rede cicloviária.");
   }
-  return best;
+  return { snap: best, distanceM: bestD };
+}
+
+function snapPointOnNetwork(snap: Snap, baseNodes: readonly LatLngTuple[]): LatLngTuple {
+  if (snap.kind === "vertex") {
+    return baseNodes[snap.id];
+  }
+  return snap.p;
 }
 
 function ensureSnapNode(nodes: LatLngTuple[], adj: Adj, snap: Snap): number {
@@ -259,36 +271,52 @@ function ensureSnapNode(nodes: LatLngTuple[], adj: Adj, snap: Snap): number {
 
 const DEFAULT_SPEED_MS = 15 / 3.6;
 
+/** Só desenha tracejado “fora da rede” quando o encosto está além deste valor (metros). */
+const DEFAULT_OFF_NETWORK_DRAW_M = 20;
+
 /**
  * Rota ao longo da união das polilinhas em `ciclovias`, com nós fundidos até `mergeM`
- * e encosto aos trechos até `snapMaxM`.
+ * e encosto sempre ao trecho mais próximo (mesmo longe — conectores retos opcionais no mapa).
  */
 export function routeOnCicloviaNetwork(
   ciclovias: Ciclovia[],
   waypoints: LatLngTuple[],
-  opts?: { mergeM?: number; snapMaxM?: number; speedMs?: number },
+  opts?: { mergeM?: number; speedMs?: number; offNetworkDrawM?: number },
 ): CicloviaNetworkRouteResult {
   if (waypoints.length < 2) {
     throw new Error("São necessários pelo menos dois pontos.");
   }
   const mergeM = opts?.mergeM ?? 20;
-  const snapMaxM = opts?.snapMaxM ?? 50;
   const speedMs = opts?.speedMs ?? DEFAULT_SPEED_MS;
+  const offNetworkDrawM = opts?.offNetworkDrawM ?? DEFAULT_OFF_NETWORK_DRAW_M;
 
   const { nodes: baseNodes, adj: baseAdj, segments, vertexCount } = buildGraph(ciclovias, mergeM);
   if (vertexCount < 2 || baseAdj.size === 0) {
     throw new Error("Rede cicloviária vazia ou sem segmentos. Carregue dados IPPUC ou verifique a fonte.");
   }
 
+  const waypointSnaps: Snap[] = [];
+  let connectorDistM = 0;
+  const offNetworkSegments: OffNetworkSegment[] = [];
+
+  for (const wp of waypoints) {
+    const { snap, distanceM } = computeSnap(wp, baseNodes, vertexCount, segments);
+    waypointSnaps.push(snap);
+    connectorDistM += distanceM;
+    if (distanceM > offNetworkDrawM) {
+      offNetworkSegments.push({ a: wp, b: snapPointOnNetwork(snap, baseNodes) });
+    }
+  }
+
   const positions: LatLngTuple[] = [];
-  let totalDist = 0;
+  let graphDistM = 0;
 
   for (let leg = 0; leg < waypoints.length - 1; leg++) {
     const adj = cloneAdj(baseAdj);
     const nodes: LatLngTuple[] = [...baseNodes];
 
-    const snapA = computeSnap(waypoints[leg], baseNodes, vertexCount, segments, snapMaxM);
-    const snapB = computeSnap(waypoints[leg + 1], baseNodes, vertexCount, segments, snapMaxM);
+    const snapA = waypointSnaps[leg];
+    const snapB = waypointSnaps[leg + 1];
 
     const idA = ensureSnapNode(nodes, adj, snapA);
     const idB = ensureSnapNode(nodes, adj, snapB);
@@ -305,7 +333,7 @@ export function routeOnCicloviaNetwork(
       );
     }
 
-    totalDist += res.dist;
+    graphDistM += res.dist;
     const pathIds = reconstructNodePath(res.prev, idA, idB);
     if (pathIds.length === 0) {
       throw new Error(
@@ -335,9 +363,12 @@ export function routeOnCicloviaNetwork(
     throw new Error("Não foi possível reconstruir a polyline na rede.");
   }
 
+  const distanceMeters = connectorDistM + graphDistM;
+
   return {
     positions,
-    distanceMeters: totalDist,
-    durationSeconds: totalDist / speedMs,
+    distanceMeters,
+    durationSeconds: distanceMeters / speedMs,
+    offNetworkSegments,
   };
 }

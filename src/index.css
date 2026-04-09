@@ -181,6 +181,11 @@
 }
 
 /* Leaflet overrides for dark theme */
+.leaflet-div-icon.route-point-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
 .leaflet-container {
   background: hsl(222 47% 5%) !important;
 }

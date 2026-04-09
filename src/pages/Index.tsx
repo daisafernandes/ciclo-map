@@ -9,12 +9,13 @@ import CycleMap from "@/components/CycleMap";
 import SearchBar from "@/components/SearchBar";
 import { midpoint, neighborhoodHighlightShape } from "@/utils/mapBounds";
 import WeatherPanel from "@/components/WeatherPanel";
+import RouteInfoPanel from "@/components/RouteInfoPanel";
 import CicloviaDetail from "@/components/CicloviaDetail";
 import MapLegend from "@/components/MapLegend";
 import MapLayerFiltersPopover from "@/components/MapLayerFiltersPopover";
 import CityStatsPanel from "@/components/CityStatsPanel";
 import NeighborhoodRankingPanel from "@/components/NeighborhoodRankingPanel";
-import { type RoutePickMode } from "@/components/RoutePlannerPanel";
+import { type RoutePickMode, type RouteAddressTarget } from "@/components/RoutePlannerPanel";
 import SourcesPanel from "@/components/SourcesPanel";
 import { TipologiasModal } from "@/components/shared/TipologiasModal";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -24,7 +25,7 @@ import { fetchCuritibaWeather } from "@/services/weather";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useFavoriteCiclovias } from "@/hooks/useFavoriteCiclovias";
 import { fetchOsrmRoute, fetchOsrmTripRoute } from "@/services/routing";
-import { routeOnCicloviaNetwork } from "@/utils/cicloviaNetworkRoute";
+import { routeOnCicloviaNetwork, type OffNetworkSegment } from "@/utils/cicloviaNetworkRoute";
 import { fetchCuritibaParksGeoJson, MIN_LARGE_PARK_AREA_M2 } from "@/services/parksOverpass";
 import { suggestParksNearRoute } from "@/utils/parksNearRoute";
 import { fetchElevationProfile, type ElevationProfilePoint } from "@/services/elevation";
@@ -126,6 +127,7 @@ const Index = () => {
   const [routeOptimizeLoading, setRouteOptimizeLoading] = useState(false);
   const [routeNetworkMode, setRouteNetworkMode] = useState<RouteNetworkMode>("ippuc");
   const [routeLinePositions, setRouteLinePositions] = useState<LatLngTuple[] | null>(null);
+  const [routeOffNetworkSegments, setRouteOffNetworkSegments] = useState<OffNetworkSegment[]>([]);
   const [routeDistanceM, setRouteDistanceM] = useState<number | null>(null);
   const [routeDurationS, setRouteDurationS] = useState<number | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
@@ -164,10 +166,52 @@ const Index = () => {
     [routePickMode],
   );
 
+  const handleRoutePointDragEnd = useCallback((index: number, p: LatLngTuple) => {
+    setRoutePoints((prev) => {
+      if (index < 0 || index >= prev.length) return prev;
+      const next = [...prev];
+      next[index] = p;
+      return next;
+    });
+  }, []);
+
+  const handleRouteAddressApply = useCallback(
+    (target: RouteAddressTarget, lat: number, lon: number, _label: string) => {
+      const p: LatLngTuple = [lat, lon];
+      setFlyTo(p);
+      if (target === "origin") {
+        setRoutePoints((prev) => {
+          if (prev.length === 0) return [p];
+          return [p, ...prev.slice(1)];
+        });
+      } else if (target === "dest") {
+        setRoutePoints((prev) => {
+          if (prev.length === 0) {
+            toast.error("Defina a origem primeiro.");
+            return prev;
+          }
+          if (prev.length === 1) return [prev[0], p];
+          return [...prev.slice(0, -1), p];
+        });
+      } else {
+        setRoutePoints((prev) => {
+          if (prev.length < 2) {
+            toast.error("Defina origem e destino antes de adicionar paradas.");
+            return prev;
+          }
+          return [...prev.slice(0, -1), p, prev[prev.length - 1]];
+        });
+      }
+      setRoutePickMode("none");
+    },
+    [],
+  );
+
   const clearRoute = useCallback(() => {
     setRoutePoints([]);
     setRouteLabels([]);
     setRouteLinePositions(null);
+    setRouteOffNetworkSegments([]);
     setRouteDistanceM(null);
     setRouteDurationS(null);
     setRouteError(null);
@@ -223,6 +267,7 @@ const Index = () => {
   useEffect(() => {
     if (routePoints.length < 2) {
       setRouteLinePositions(null);
+      setRouteOffNetworkSegments([]);
       setRouteDistanceM(null);
       setRouteDurationS(null);
       setRouteError(null);
@@ -238,12 +283,14 @@ const Index = () => {
         const r = routeOnCicloviaNetwork(ciclovias, routePoints);
         if (!cancelled) {
           setRouteLinePositions(r.positions);
+          setRouteOffNetworkSegments(r.offNetworkSegments);
           setRouteDistanceM(r.distanceMeters);
           setRouteDurationS(r.durationSeconds);
         }
       } catch (e: unknown) {
         if (!cancelled) {
           setRouteLinePositions(null);
+          setRouteOffNetworkSegments([]);
           setRouteDistanceM(null);
           setRouteDurationS(null);
           setRouteError(e instanceof Error ? e.message : "Não foi possível calcular a rota na rede IPPUC.");
@@ -256,6 +303,7 @@ const Index = () => {
       };
     }
 
+    setRouteOffNetworkSegments([]);
     fetchOsrmRoute(routePoints)
       .then((r) => {
         if (cancelled) return;
@@ -558,6 +606,15 @@ const Index = () => {
   const routeLabelB = routeLabels.length >= 2 ? routeLabels[routeLabels.length - 1] ?? null : null;
   const routeWaypointCount = Math.max(0, routePoints.length - 2);
 
+  const showRouteInfoCard =
+    routePoints.length >= 2 &&
+    routeLinePositions != null &&
+    routeLinePositions.length >= 2 &&
+    !routeLoading &&
+    routeError == null &&
+    routeDistanceM != null &&
+    routeDurationS != null;
+
   return (
     <div
       className={cn(
@@ -586,8 +643,11 @@ const Index = () => {
           userLocation={userLocation}
           routePickMode={routePickMode}
           onRouteMapClick={handleRouteMapClick}
+          showRouteLine={routePickMode === "none"}
           routeLinePositions={routeLinePositions}
+          routeOffNetworkSegments={routeNetworkMode === "ippuc" ? routeOffNetworkSegments : undefined}
           routePoints={routePoints}
+          onRoutePointDragEnd={handleRoutePointDragEnd}
           cityFitResetKey={mapViewResetKey}
         />
       </div>
@@ -658,6 +718,10 @@ const Index = () => {
                   elevationLoading,
                   elevationError,
                   elevationData,
+                  onRouteAddressApply: handleRouteAddressApply,
+                  hasIppucOffNetworkConnectors:
+                    routeNetworkMode === "ippuc" && routeOffNetworkSegments.length > 0,
+                  canSetWaypointByAddress: routePoints.length >= 2,
                 }}
               />
             </motion.div>
@@ -807,6 +871,34 @@ const Index = () => {
           <SourcesPanel onOpenTipologias={() => setTipologiasOpen(true)} />
         </div>
       </div>
+
+      {/* Rota traçada — direita, centro vertical */}
+      {showRouteInfoCard && (
+        <div
+          className={cn(
+            "absolute z-10 right-4 top-1/2 -translate-y-1/2",
+            "w-[min(100%,calc(100vw-2rem))] max-w-[min(18rem,calc(100vw-5rem))] sm:w-72",
+            "max-h-[min(72vh,calc(100vh-8rem))] overflow-y-auto overflow-x-hidden",
+            "pointer-events-auto",
+          )}
+        >
+          <RouteInfoPanel
+            labelA={routeLabelA}
+            labelB={routeLabelB}
+            waypointCount={routeWaypointCount}
+            distanceMeters={routeDistanceM}
+            durationSeconds={routeDurationS}
+            routeNetworkMode={routeNetworkMode}
+            hasIppucOffNetworkConnectors={
+              routeNetworkMode === "ippuc" && routeOffNetworkSegments.length > 0
+            }
+            elevationLoading={elevationLoading}
+            elevationError={elevationError}
+            elevationData={elevationData}
+            onClear={clearRoute}
+          />
+        </div>
+      )}
 
       {/* Right Panel - Detail */}
       <AnimatePresence>

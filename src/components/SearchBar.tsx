@@ -4,7 +4,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "react-router-dom";
 import { Ciclovia, getTypeLabel } from "@/data/ciclovias";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import RoutePlannerPanel, { type RoutePickMode } from "@/components/RoutePlannerPanel";
+import RoutePlannerPanel, {
+  type RoutePickMode,
+  type RouteAddressTarget,
+} from "@/components/RoutePlannerPanel";
 import type { RouteNetworkMode } from "@/utils/mapUrlParams";
 import type { ParkNearRouteSuggestion } from "@/utils/parksNearRoute";
 import { buildWhatsAppShareUrl, formatRouteShareMessage } from "@/utils/routeShare";
@@ -40,6 +43,9 @@ export interface SearchBarRouteProps {
   elevationData: ElevationProfilePoint[] | null;
   routeNetworkMode: RouteNetworkMode;
   onRouteNetworkModeChange: (mode: RouteNetworkMode) => void;
+  onRouteAddressApply?: (target: RouteAddressTarget, lat: number, lon: number, label: string) => void;
+  hasIppucOffNetworkConnectors?: boolean;
+  canSetWaypointByAddress?: boolean;
 }
 
 interface SearchBarProps {
@@ -227,6 +233,9 @@ const SearchBar = ({
                 optimizeLoading={route.optimizeLoading}
                 routeNetworkMode={route.routeNetworkMode}
                 onRouteNetworkModeChange={route.onRouteNetworkModeChange}
+                onApplyAddress={route.onRouteAddressApply}
+                hasIppucOffNetworkConnectors={route.hasIppucOffNetworkConnectors}
+                canSetWaypointByAddress={route.canSetWaypointByAddress}
               />
               <div className="border-t border-border/50 pt-3 space-y-2">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Resumo</p>

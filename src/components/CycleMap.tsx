@@ -6,6 +6,7 @@ import {
   Polygon,
   Popup,
   CircleMarker,
+  Marker,
   ZoomControl,
   useMap,
   useMapEvents,
@@ -49,6 +50,27 @@ const typeStyles = {
   ciclovia: { weight: 5, opacity: 0.9, dashArray: undefined },
   ciclofaixa: { weight: 4, opacity: 0.8, dashArray: "10 6" },
   ciclorrota: { weight: 3, opacity: 0.7, dashArray: "4 8" },
+};
+
+const routePointIcons = {
+  origin: L.divIcon({
+    className: "route-point-marker",
+    html: '<div style="width:14px;height:14px;border-radius:50%;background:#4ade80;border:2px solid #22c55e;box-shadow:0 1px 4px rgba(0,0,0,.45)"></div>',
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+  }),
+  dest: L.divIcon({
+    className: "route-point-marker",
+    html: '<div style="width:14px;height:14px;border-radius:50%;background:#fca5a5;border:2px solid #ef4444;box-shadow:0 1px 4px rgba(0,0,0,.45)"></div>',
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+  }),
+  waypoint: L.divIcon({
+    className: "route-point-marker",
+    html: '<div style="width:12px;height:12px;border-radius:50%;background:#fcd34d;border:2px solid #d97706;box-shadow:0 1px 4px rgba(0,0,0,.45)"></div>',
+    iconSize: [12, 12],
+    iconAnchor: [6, 6],
+  }),
 };
 
 interface FlyToProps {
@@ -171,9 +193,14 @@ interface CycleMapProps {
   /** Modo de clique para definir origem/destino da rota OSRM. */
   routePickMode?: RoutePickMode;
   onRouteMapClick?: (p: LatLngTuple) => void;
+  /** Quando false, não desenha a polyline calculada (ex.: modo de escolher ponto no mapa). */
+  showRouteLine?: boolean;
   routeLinePositions?: LatLngTuple[] | null;
+  /** Trechos estimados fora da rede IPPUC (reta usuário → rede). */
+  routeOffNetworkSegments?: { a: LatLngTuple; b: LatLngTuple }[];
   /** Ordem: origem, paradas opcionais, destino. */
   routePoints?: LatLngTuple[];
+  onRoutePointDragEnd?: (index: number, latlng: LatLngTuple) => void;
   /** Incrementar para recentrar a vista na rede visível (fechar busca / detalhe). */
   cityFitResetKey?: number;
 }
@@ -190,12 +217,17 @@ const CycleMap = ({
   userLocation = null,
   routePickMode = "none",
   onRouteMapClick,
+  showRouteLine = true,
   routeLinePositions = null,
+  routeOffNetworkSegments,
   routePoints = [],
+  onRoutePointDragEnd,
   cityFitResetKey = 0,
 }: CycleMapProps) => {
   const curitibaCenter: LatLngExpression = [-25.4284, -49.2733];
   const tile = BASE_LAYERS[baseLayer];
+  const cicloviasInteractive = routePickMode === "none";
+  const markersDraggable = Boolean(onRoutePointDragEnd) && routePickMode === "none";
 
   return (
     <MapContainer
@@ -252,6 +284,7 @@ const CycleMap = ({
         return (
           <Polyline
             key={ciclovia.id}
+            interactive={cicloviasInteractive}
             positions={ciclovia.coordinates}
             pathOptions={{
               color: isSelected ? "#14b8a6" : safetyColors[ciclovia.safety],
@@ -289,7 +322,23 @@ const CycleMap = ({
           </Polyline>
         );
       })}
-      {routeLinePositions && routeLinePositions.length >= 2 && (
+      {showRouteLine && (routeOffNetworkSegments?.length ?? 0) > 0
+        ? (routeOffNetworkSegments ?? []).map((seg, i) => (
+            <Polyline
+              key={`off-net-${i}-${seg.a[0]}-${seg.a[1]}`}
+              positions={[seg.a, seg.b]}
+              pathOptions={{
+                color: "#94a3b8",
+                weight: 4,
+                opacity: 0.55,
+                dashArray: "10 8",
+                lineCap: "round",
+                lineJoin: "round",
+              }}
+            />
+          ))
+        : null}
+      {showRouteLine && routeLinePositions && routeLinePositions.length >= 2 && (
         <Polyline
           positions={routeLinePositions}
           pathOptions={{
@@ -314,17 +363,24 @@ const CycleMap = ({
               : isDest
                 ? "Destino (rota)"
                 : `Parada ${i}`;
-        const pathOptions = isOrigin
-          ? { color: "#22c55e", weight: 3, fillColor: "#4ade80", fillOpacity: 0.5 }
-          : isDest
-            ? { color: "#ef4444", weight: 3, fillColor: "#fca5a5", fillOpacity: 0.45 }
-            : { color: "#d97706", weight: 3, fillColor: "#fcd34d", fillOpacity: 0.5 };
+        const icon = isOrigin ? routePointIcons.origin : isDest ? routePointIcons.dest : routePointIcons.waypoint;
         return (
-          <CircleMarker key={`rp-${i}-${pt[0]}-${pt[1]}`} center={pt} radius={isWaypoint ? 7 : 8} pathOptions={pathOptions}>
+          <Marker
+            key={`rp-${i}`}
+            position={pt}
+            icon={icon}
+            draggable={markersDraggable}
+            eventHandlers={{
+              dragend: (e) => {
+                const ll = e.target.getLatLng();
+                onRoutePointDragEnd?.(i, [ll.lat, ll.lng]);
+              },
+            }}
+          >
             <Popup>
               <span className="text-xs">{label}</span>
             </Popup>
-          </CircleMarker>
+          </Marker>
         );
       })}
     </MapContainer>
