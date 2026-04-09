@@ -160,8 +160,8 @@ interface CycleMapProps {
   routePickMode?: RoutePickMode;
   onRouteMapClick?: (p: LatLngTuple) => void;
   routeLinePositions?: LatLngTuple[] | null;
-  routePointA?: LatLngTuple | null;
-  routePointB?: LatLngTuple | null;
+  /** Ordem: origem, paradas opcionais, destino. */
+  routePoints?: LatLngTuple[];
 }
 
 const CycleMap = ({
@@ -177,8 +177,7 @@ const CycleMap = ({
   routePickMode = "none",
   onRouteMapClick,
   routeLinePositions = null,
-  routePointA = null,
-  routePointB = null,
+  routePoints = [],
 }: CycleMapProps) => {
   const curitibaCenter: LatLngExpression = [-25.4284, -49.2733];
   const tile = BASE_LAYERS[baseLayer];
@@ -286,28 +285,32 @@ const CycleMap = ({
           }}
         />
       )}
-      {routePointA && (
-        <CircleMarker
-          center={routePointA}
-          radius={8}
-          pathOptions={{ color: "#22c55e", weight: 3, fillColor: "#4ade80", fillOpacity: 0.5 }}
-        >
-          <Popup>
-            <span className="text-xs">Origem (rota)</span>
-          </Popup>
-        </CircleMarker>
-      )}
-      {routePointB && (
-        <CircleMarker
-          center={routePointB}
-          radius={8}
-          pathOptions={{ color: "#ef4444", weight: 3, fillColor: "#fca5a5", fillOpacity: 0.45 }}
-        >
-          <Popup>
-            <span className="text-xs">Destino (rota)</span>
-          </Popup>
-        </CircleMarker>
-      )}
+      {routePoints.map((pt, i) => {
+        const n = routePoints.length;
+        const isOrigin = i === 0;
+        const isDest = n >= 2 && i === n - 1;
+        const isWaypoint = n >= 3 && !isOrigin && !isDest;
+        const label =
+          n === 1
+            ? "Origem (rota)"
+            : isOrigin
+              ? "Origem (rota)"
+              : isDest
+                ? "Destino (rota)"
+                : `Parada ${i}`;
+        const pathOptions = isOrigin
+          ? { color: "#22c55e", weight: 3, fillColor: "#4ade80", fillOpacity: 0.5 }
+          : isDest
+            ? { color: "#ef4444", weight: 3, fillColor: "#fca5a5", fillOpacity: 0.45 }
+            : { color: "#d97706", weight: 3, fillColor: "#fcd34d", fillOpacity: 0.5 };
+        return (
+          <CircleMarker key={`rp-${i}-${pt[0]}-${pt[1]}`} center={pt} radius={isWaypoint ? 7 : 8} pathOptions={pathOptions}>
+            <Popup>
+              <span className="text-xs">{label}</span>
+            </Popup>
+          </CircleMarker>
+        );
+      })}
     </MapContainer>
   );
 };

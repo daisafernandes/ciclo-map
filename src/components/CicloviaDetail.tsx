@@ -1,7 +1,9 @@
-import { X, Shield, Activity, Route, MapPin, Clock, Download, FileJson, Star } from "lucide-react";
+import { X, Shield, Activity, Route, MapPin, Clock, Download, FileJson, Star, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { Ciclovia, getSafetyLabel, getTypeLabel, getTrafficLevel, mockTrafficHistory } from "@/data/ciclovias";
+import { Ciclovia, getSafetyLabel, getTypeLabel, getTrafficLevel } from "@/data/ciclovias";
+import { getTrafficHistory } from "@/services/traffic";
 import { downloadCicloviaGeoJson, downloadCicloviaGpx } from "@/utils/exportRoute";
 
 interface CicloviaDetailProps {
@@ -27,6 +29,15 @@ const CicloviaDetail = ({ ciclovia, onClose, isFavorite, onToggleFavorite }: Cic
   const safety = getSafetyLabel(ciclovia.safety);
   const currentHour = new Date().getHours();
   const trafficLevel = getTrafficLevel(currentHour);
+
+  const trafficQuery = useQuery({
+    queryKey: ["traffic-history", ciclovia.id],
+    queryFn: () => getTrafficHistory(ciclovia.id),
+    staleTime: 1000 * 60 * 30,
+  });
+
+  const trafficHistory = trafficQuery.data?.history;
+  const trafficSource = trafficQuery.data?.source ?? "mock";
 
   return (
     <motion.div
@@ -123,15 +134,26 @@ const CicloviaDetail = ({ ciclovia, onClose, isFavorite, onToggleFavorite }: Cic
       </div>
 
       <p className="text-[10px] text-muted-foreground/85 leading-relaxed border border-border/40 rounded-lg px-2.5 py-2 bg-secondary/20">
-        Movimento e gráfico abaixo são <span className="font-medium text-foreground/90">indicativos</span> (demonstração no app), não dados oficiais da IPPUC.
+        Movimento e gráfico abaixo são <span className="font-medium text-foreground/90">indicativos</span>
+        {trafficSource === "remote" ? (
+          <> — série carregada da fonte configurada (não é dado oficial IPPUC).</>
+        ) : (
+          <> (demonstração no app), não dados oficiais da IPPUC.</>
+        )}
       </p>
 
       {/* Traffic Chart */}
       <div>
         <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Histórico de movimento</h4>
-        <div className="h-32">
+        <div className="h-32 relative">
+          {trafficQuery.isLoading && (
+            <div className="absolute inset-0 z-[1] flex items-center justify-center rounded-md bg-background/50 backdrop-blur-[1px]">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" aria-hidden />
+              <span className="sr-only">Carregando histórico de movimento</span>
+            </div>
+          )}
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={mockTrafficHistory}>
+            <AreaChart data={trafficHistory ?? []}>
               <defs>
                 <linearGradient id="colorMovement" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="hsl(168, 76%, 40%)" stopOpacity={0.3} />

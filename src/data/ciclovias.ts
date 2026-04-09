@@ -34,6 +34,10 @@ export interface WeatherData {
   condition: string;
   icon: string;
   updatedAt: string;
+  /** Soma de precipitação prevista nas próximas ~3 h (mm), quando disponível. */
+  precipitationNext3hMm?: number;
+  /** Rajada máxima prevista nas próximas ~3 h (km/h), quando disponível. */
+  maxWindGustNext3hKmh?: number;
 }
 
 export interface TrafficHistory {

@@ -11,6 +11,8 @@ export interface RouteSummaryFieldsProps {
   error: string | null;
   /** Quando true, mostra A/B mesmo sem rota iniciada (ex.: painel Rota na busca). */
   showPlaceholders?: boolean;
+  /** Paradas entre A e B (somente contagem na UI compacta). */
+  waypointCount?: number;
 }
 
 export function routeSummaryIsActive(props: RouteSummaryFieldsProps): boolean {
@@ -42,13 +44,16 @@ export function RouteSummaryFields({
   loading,
   error,
   showPlaceholders = false,
+  waypointCount = 0,
 }: RouteSummaryFieldsProps) {
   const pickHint =
     pickMode === "origin"
       ? "Clique no mapa: origem"
       : pickMode === "dest"
         ? "Clique no mapa: destino"
-        : null;
+        : pickMode === "waypoint"
+          ? "Clique no mapa: parada (antes do destino)"
+          : null;
 
   const showBody =
     showPlaceholders ||
@@ -63,6 +68,11 @@ export function RouteSummaryFields({
           <span className="text-muted-foreground/80 font-medium">A</span>{" "}
           <span className="text-foreground">{labelA ?? "—"}</span>
         </p>
+        {waypointCount > 0 && (
+          <p className="text-[10px] text-muted-foreground/90 pl-1 border-l border-border/40">
+            + {waypointCount} parada{waypointCount === 1 ? "" : "s"}
+          </p>
+        )}
         <p className="truncate" title={labelB ?? undefined}>
           <span className="text-muted-foreground/80 font-medium">B</span>{" "}
           <span className="text-foreground">{labelB ?? "—"}</span>

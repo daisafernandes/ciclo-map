@@ -23,7 +23,9 @@ import { loadCiclovias } from "@/services/cicloviasSource";
 import { fetchCuritibaWeather } from "@/services/weather";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useFavoriteCiclovias } from "@/hooks/useFavoriteCiclovias";
-import { fetchOsrmRoute } from "@/services/routing";
+import { fetchOsrmRoute, fetchOsrmTripRoute } from "@/services/routing";
+import { fetchCuritibaParksGeoJson, MIN_LARGE_PARK_AREA_M2 } from "@/services/parksOverpass";
+import { suggestParksNearRoute } from "@/utils/parksNearRoute";
 import { fetchElevationProfile, type ElevationProfilePoint } from "@/services/elevation";
 import { reverseGeocodePoint } from "@/services/reverseGeocode";
 import { formatLatLngTuple } from "@/utils/geoFormat";
@@ -36,6 +38,8 @@ import {
   baseLayerToParam,
   encodeRoutePoint,
   decodeRoutePoint,
+  encodeRouteWaypoints,
+  decodeRouteWaypoints,
   type BaseLayerId,
 } from "@/utils/mapUrlParams";
 import { cn } from "@/lib/utils";
@@ -102,85 +106,107 @@ const Index = () => {
     if (favoriteIdsArr.length === 0) setFavoritesOnly(false);
   }, [favoriteIdsArr.length]);
 
-  const [routePointA, setRoutePointA] = useState<LatLngTuple | null>(null);
-  const [routePointB, setRoutePointB] = useState<LatLngTuple | null>(null);
+  const [routePoints, setRoutePoints] = useState<LatLngTuple[]>([]);
+  const [routeLabels, setRouteLabels] = useState<(string | null)[]>([]);
   const [routePickMode, setRoutePickMode] = useState<RoutePickMode>("none");
+  const [routeOptimizeLoading, setRouteOptimizeLoading] = useState(false);
   const [routeLinePositions, setRouteLinePositions] = useState<LatLngTuple[] | null>(null);
   const [routeDistanceM, setRouteDistanceM] = useState<number | null>(null);
   const [routeDurationS, setRouteDurationS] = useState<number | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
-  const [routeLabelA, setRouteLabelA] = useState<string | null>(null);
-  const [routeLabelB, setRouteLabelB] = useState<string | null>(null);
   const [elevationData, setElevationData] = useState<ElevationProfilePoint[] | null>(null);
   const [elevationLoading, setElevationLoading] = useState(false);
   const [elevationError, setElevationError] = useState<string | null>(null);
 
   const handleRouteMapClick = useCallback(
     (p: LatLngTuple) => {
-      if (routePickMode === "origin") setRoutePointA(p);
-      else if (routePickMode === "dest") setRoutePointB(p);
+      if (routePickMode === "origin") {
+        setRoutePoints((prev) => {
+          if (prev.length === 0) return [p];
+          return [p, ...prev.slice(1)];
+        });
+      } else if (routePickMode === "dest") {
+        setRoutePoints((prev) => {
+          if (prev.length === 0) {
+            toast.error("Defina a origem primeiro.");
+            return prev;
+          }
+          if (prev.length === 1) return [prev[0], p];
+          return [...prev.slice(0, -1), p];
+        });
+      } else if (routePickMode === "waypoint") {
+        setRoutePoints((prev) => {
+          if (prev.length < 2) {
+            toast.error("Defina origem e destino antes de adicionar paradas.");
+            return prev;
+          }
+          return [...prev.slice(0, -1), p, prev[prev.length - 1]];
+        });
+      }
       setRoutePickMode("none");
     },
     [routePickMode],
   );
 
   const clearRoute = useCallback(() => {
-    setRoutePointA(null);
-    setRoutePointB(null);
+    setRoutePoints([]);
+    setRouteLabels([]);
     setRouteLinePositions(null);
     setRouteDistanceM(null);
     setRouteDurationS(null);
     setRouteError(null);
     setRoutePickMode("none");
     setRouteLoading(false);
-    setRouteLabelA(null);
-    setRouteLabelB(null);
+    setRouteOptimizeLoading(false);
     setElevationData(null);
     setElevationError(null);
     setElevationLoading(false);
   }, []);
 
+  const handleOptimizeTrip = useCallback(async () => {
+    if (routePoints.length < 3) return;
+    setRouteOptimizeLoading(true);
+    setRouteError(null);
+    try {
+      const r = await fetchOsrmTripRoute(routePoints);
+      setRoutePoints(r.optimizedPoints);
+      toast.success("Ordem das paradas otimizada.");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Não foi possível otimizar a rota.";
+      setRouteError(msg);
+      toast.error(msg);
+    } finally {
+      setRouteOptimizeLoading(false);
+    }
+  }, [routePoints]);
+
   useEffect(() => {
-    if (!routePointA) {
-      setRouteLabelA(null);
+    if (routePoints.length === 0) {
+      setRouteLabels([]);
       return;
     }
     const ac = new AbortController();
-    let cancelled = false;
-    setRouteLabelA(formatLatLngTuple(routePointA));
-    reverseGeocodePoint(routePointA, ac.signal)
-      .then((t) => {
-        if (!cancelled && t) setRouteLabelA(t);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-      ac.abort();
-    };
-  }, [routePointA]);
+    const nextLabels = routePoints.map((pt) => formatLatLngTuple(pt));
+    setRouteLabels(nextLabels);
+    routePoints.forEach((pt, i) => {
+      reverseGeocodePoint(pt, ac.signal)
+        .then((t) => {
+          if (ac.signal.aborted || !t) return;
+          setRouteLabels((prev) => {
+            if (prev.length !== routePoints.length) return prev;
+            const copy = [...prev];
+            copy[i] = t;
+            return copy;
+          });
+        })
+        .catch(() => {});
+    });
+    return () => ac.abort();
+  }, [routePoints]);
 
   useEffect(() => {
-    if (!routePointB) {
-      setRouteLabelB(null);
-      return;
-    }
-    const ac = new AbortController();
-    let cancelled = false;
-    setRouteLabelB(formatLatLngTuple(routePointB));
-    reverseGeocodePoint(routePointB, ac.signal)
-      .then((t) => {
-        if (!cancelled && t) setRouteLabelB(t);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-      ac.abort();
-    };
-  }, [routePointB]);
-
-  useEffect(() => {
-    if (!routePointA || !routePointB) {
+    if (routePoints.length < 2) {
       setRouteLinePositions(null);
       setRouteDistanceM(null);
       setRouteDurationS(null);
@@ -191,7 +217,7 @@ const Index = () => {
     let cancelled = false;
     setRouteLoading(true);
     setRouteError(null);
-    fetchOsrmRoute(routePointA, routePointB)
+    fetchOsrmRoute(routePoints)
       .then((r) => {
         if (cancelled) return;
         setRouteLinePositions(r.positions);
@@ -211,7 +237,7 @@ const Index = () => {
     return () => {
       cancelled = true;
     };
-  }, [routePointA, routePointB]);
+  }, [routePoints]);
 
   useEffect(() => {
     if (!routeLinePositions?.length) {
@@ -241,16 +267,36 @@ const Index = () => {
     };
   }, [routeLinePositions]);
 
-  /** Qualquer ponto de rota substitui seleção de trecho/bairro (alinha com URL `from`/`to`). */
+  const parksQuery = useQuery({
+    queryKey: ["osm-parks-curitiba", "large", MIN_LARGE_PARK_AREA_M2],
+    queryFn: async () => {
+      try {
+        return await fetchCuritibaParksGeoJson();
+      } catch {
+        return { type: "FeatureCollection" as const, features: [] };
+      }
+    },
+    staleTime: 1000 * 60 * 60 * 24,
+    gcTime: 1000 * 60 * 60 * 24,
+    enabled: routeLinePositions != null && routeLinePositions.length >= 2,
+    retry: 1,
+  });
+
+  const parkSuggestions = useMemo(() => {
+    if (!routeLinePositions?.length || !parksQuery.data?.features.length) return [];
+    return suggestParksNearRoute(routeLinePositions, parksQuery.data);
+  }, [routeLinePositions, parksQuery.data]);
+
+  /** Qualquer ponto de rota substitui seleção de trecho/bairro (alinha com URL `from`/`to` / `route`). */
   useEffect(() => {
-    if (!routePointA && !routePointB) return;
+    if (routePoints.length === 0) return;
     setSelectedCiclovia(null);
     setNeighborhoodName(null);
     setNeighborhoodHighlight(null);
     setMapHighlightIds(null);
     setSidebarOpen(false);
     setFlyTo(null);
-  }, [routePointA, routePointB]);
+  }, [routePoints]);
 
   const visibleCiclovias = useMemo(() => {
     let list = ciclovias;
@@ -330,6 +376,7 @@ const Index = () => {
 
     const cicloviaId = searchParams.get("ciclovia");
     const bairroRaw = searchParams.get("bairro");
+    const routeParam = decodeRouteWaypoints(searchParams.get("route"));
     const from = decodeRoutePoint(searchParams.get("from"));
     const to = decodeRoutePoint(searchParams.get("to"));
     const tipo = searchParams.get("tipo");
@@ -340,9 +387,13 @@ const Index = () => {
     setSafetyFilter(decodeSafetyFilter(seg));
     setBaseLayer(parseBaseLayer(map));
 
-    if (from || to) {
-      if (from) setRoutePointA(from);
-      if (to) setRoutePointB(to);
+    if (routeParam && routeParam.length >= 2) {
+      setRoutePoints(routeParam);
+    } else if (from || to) {
+      const pts: LatLngTuple[] = [];
+      if (from) pts.push(from);
+      if (to) pts.push(to);
+      if (pts.length >= 1) setRoutePoints(pts);
     } else if (cicloviaId) {
       const c = ciclovias.find((x) => x.id === cicloviaId);
       if (c) {
@@ -385,9 +436,16 @@ const Index = () => {
   useEffect(() => {
     if (!urlReady) return;
     const next = new URLSearchParams();
-    if (routePointA || routePointB) {
-      if (routePointA) next.set("from", encodeRoutePoint(routePointA));
-      if (routePointB) next.set("to", encodeRoutePoint(routePointB));
+    if (routePoints.length >= 2) {
+      if (routePoints.length === 2) {
+        next.set("from", encodeRoutePoint(routePoints[0]));
+        next.set("to", encodeRoutePoint(routePoints[1]));
+      } else {
+        const enc = encodeRouteWaypoints(routePoints);
+        if (enc) next.set("route", enc);
+      }
+    } else if (routePoints.length === 1) {
+      next.set("from", encodeRoutePoint(routePoints[0]));
     } else if (selectedCiclovia) {
       next.set("ciclovia", selectedCiclovia.id);
     } else if (neighborhoodName) {
@@ -402,8 +460,7 @@ const Index = () => {
     setSearchParams(next, { replace: true });
   }, [
     urlReady,
-    routePointA,
-    routePointB,
+    routePoints,
     selectedCiclovia,
     neighborhoodName,
     typeFilter,
@@ -429,6 +486,10 @@ const Index = () => {
   const weatherData = weatherQuery.data ?? mockWeather;
   const weatherLoading = weatherQuery.isLoading && !weatherQuery.data;
   const weatherFallback = weatherQuery.isError;
+
+  const routeLabelA = routeLabels[0] ?? null;
+  const routeLabelB = routeLabels.length >= 2 ? routeLabels[routeLabels.length - 1] ?? null : null;
+  const routeWaypointCount = Math.max(0, routePoints.length - 2);
 
   return (
     <div
@@ -459,8 +520,7 @@ const Index = () => {
           routePickMode={routePickMode}
           onRouteMapClick={handleRouteMapClick}
           routeLinePositions={routeLinePositions}
-          routePointA={routePointA}
-          routePointB={routePointB}
+          routePoints={routePoints}
         />
       </div>
 
@@ -507,6 +567,11 @@ const Index = () => {
                   onClear: clearRoute,
                   labelA: routeLabelA,
                   labelB: routeLabelB,
+                  waypointCount: routeWaypointCount,
+                  onOptimizeTrip: handleOptimizeTrip,
+                  optimizeLoading: routeOptimizeLoading,
+                  canOptimizeTrip: routePoints.length >= 3 && !routeLoading,
+                  parkSuggestions,
                   distanceMeters: routeDistanceM,
                   durationSeconds: routeDurationS,
                   loading: routeLoading,

@@ -27,6 +27,25 @@ export function decodeRoutePoint(raw: string | null): LatLngTuple | null {
   return [lat, lng];
 }
 
+/** Vários pontos na URL: `lat,lng;lat,lng;...` (ponto e vírgula entre trechos). */
+export function encodeRouteWaypoints(points: LatLngTuple[]): string | null {
+  if (points.length < 2) return null;
+  return points.map((p) => encodeRoutePoint(p)).join(";");
+}
+
+export function decodeRouteWaypoints(raw: string | null): LatLngTuple[] | null {
+  if (!raw?.trim()) return null;
+  const chunks = raw.split(";").map((s) => s.trim()).filter(Boolean);
+  if (chunks.length < 2) return null;
+  const out: LatLngTuple[] = [];
+  for (const ch of chunks) {
+    const p = decodeRoutePoint(ch);
+    if (!p) return null;
+    out.push(p);
+  }
+  return out;
+}
+
 const TYPE_ORDER: Ciclovia["type"][] = ["ciclovia", "ciclofaixa", "ciclorrota"];
 const TYPE_LETTER: Record<Ciclovia["type"], string> = {
   ciclovia: "c",
