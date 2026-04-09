@@ -13,20 +13,18 @@ function osrmBaseUrl(): string {
   return "/osrm";
 }
 
-/**
- * Perfil OSRM. O demo público `router.project-osrm.org` costuma expor só `driving`;
- * perfis como `cycling` podem responder com `InvalidUrl`. Sobrescreva com
- * `VITE_OSRM_PROFILE` se usar instância própria com dados bike/foot.
- */
-function osrmProfile(): string {
-  const p = import.meta.env.VITE_OSRM_PROFILE?.trim();
-  if (p) return p;
-  return "driving";
+/** Perfil fixo do app nos pedidos OSRM (rede para bicicleta em dados OSM). */
+export const OSRM_APP_PROFILE = "cycling" as const;
+
+function resolveOsrmProfile(options?: { profile?: string }): string {
+  const o = options?.profile?.trim();
+  if (o) return o;
+  return OSRM_APP_PROFILE;
 }
 
 function osrmErrorMessage(code: string | undefined, message: string | undefined): string {
   const hintProfile =
-    "O servidor OSRM pode não expor este perfil (o público costuma aceitar só “driving”). Use uma instância própria com dados OSM e defina VITE_OSRM_PROFILE no .env, ou volte ao perfil padrão.";
+    "O servidor OSRM público pode não expor o perfil de bicicleta. Use uma instância própria com dados OSM (perfil cycling) e defina VITE_OSRM_URL no .env.";
   if (code === "InvalidUrl" || code === "InvalidQuery") {
     return `Pedido inválido ao OSRM (${code}). ${hintProfile}`;
   }
@@ -61,14 +59,22 @@ function geometryToPositions(route: NonNullable<OsrmGeometryResponse["routes"]>[
   return coords.map(([lng, lat]) => [lat, lng]);
 }
 
+export type OsrmRoutingOptions = {
+  /** Sobrescreve o perfil fixo do app (`cycling`) para esta chamada. */
+  profile?: string;
+};
+
 /**
  * Rota viária passando por todos os pontos, na ordem informada (OSRM Route).
  */
-export async function fetchOsrmRoute(waypoints: LatLngTuple[]): Promise<OsrmRouteResult> {
+export async function fetchOsrmRoute(
+  waypoints: LatLngTuple[],
+  options?: OsrmRoutingOptions,
+): Promise<OsrmRouteResult> {
   if (waypoints.length < 2) {
     throw new Error("São necessários pelo menos dois pontos.");
   }
-  const profile = osrmProfile();
+  const profile = resolveOsrmProfile(options);
   const path = coordsPath(waypoints);
   const url = `${osrmBaseUrl()}/route/v1/${profile}/${path}?overview=full&geometries=geojson`;
 
@@ -112,13 +118,14 @@ interface OsrmTripResponse {
  * Trip otimizado com primeiro ponto como origem e último como destino (meio reordenado).
  * Retorna geometria e a ordem sugerida dos waypoints (para atualizar marcadores).
  */
-export async function fetchOsrmTripRoute(waypoints: LatLngTuple[]): Promise<
-  OsrmRouteResult & { optimizedPoints: LatLngTuple[] }
-> {
+export async function fetchOsrmTripRoute(
+  waypoints: LatLngTuple[],
+  options?: OsrmRoutingOptions,
+): Promise<OsrmRouteResult & { optimizedPoints: LatLngTuple[] }> {
   if (waypoints.length < 2) {
     throw new Error("São necessários pelo menos dois pontos.");
   }
-  const profile = osrmProfile();
+  const profile = resolveOsrmProfile(options);
   const path = coordsPath(waypoints);
   const url = `${osrmBaseUrl()}/trip/v1/${profile}/${path}?overview=full&geometries=geojson&roundtrip=false&source=first&destination=last`;
 

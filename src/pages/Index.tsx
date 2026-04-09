@@ -24,6 +24,7 @@ import { fetchCuritibaWeather } from "@/services/weather";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useFavoriteCiclovias } from "@/hooks/useFavoriteCiclovias";
 import { fetchOsrmRoute, fetchOsrmTripRoute } from "@/services/routing";
+import { routeOnCicloviaNetwork } from "@/utils/cicloviaNetworkRoute";
 import { fetchCuritibaParksGeoJson, MIN_LARGE_PARK_AREA_M2 } from "@/services/parksOverpass";
 import { suggestParksNearRoute } from "@/utils/parksNearRoute";
 import { fetchElevationProfile, type ElevationProfilePoint } from "@/services/elevation";
@@ -40,7 +41,10 @@ import {
   decodeRoutePoint,
   encodeRouteWaypoints,
   decodeRouteWaypoints,
+  parseRouteNetworkMode,
+  encodeRouteNetworkMode,
   type BaseLayerId,
+  type RouteNetworkMode,
 } from "@/utils/mapUrlParams";
 import { cn } from "@/lib/utils";
 
@@ -110,6 +114,7 @@ const Index = () => {
   const [routeLabels, setRouteLabels] = useState<(string | null)[]>([]);
   const [routePickMode, setRoutePickMode] = useState<RoutePickMode>("none");
   const [routeOptimizeLoading, setRouteOptimizeLoading] = useState(false);
+  const [routeNetworkMode, setRouteNetworkMode] = useState<RouteNetworkMode>("ippuc");
   const [routeLinePositions, setRouteLinePositions] = useState<LatLngTuple[] | null>(null);
   const [routeDistanceM, setRouteDistanceM] = useState<number | null>(null);
   const [routeDurationS, setRouteDurationS] = useState<number | null>(null);
@@ -165,7 +170,7 @@ const Index = () => {
   }, []);
 
   const handleOptimizeTrip = useCallback(async () => {
-    if (routePoints.length < 3) return;
+    if (routeNetworkMode !== "osrm" || routePoints.length < 3) return;
     setRouteOptimizeLoading(true);
     setRouteError(null);
     try {
@@ -179,7 +184,7 @@ const Index = () => {
     } finally {
       setRouteOptimizeLoading(false);
     }
-  }, [routePoints]);
+  }, [routeNetworkMode, routePoints]);
 
   useEffect(() => {
     if (routePoints.length === 0) {
@@ -217,6 +222,30 @@ const Index = () => {
     let cancelled = false;
     setRouteLoading(true);
     setRouteError(null);
+
+    if (routeNetworkMode === "ippuc") {
+      try {
+        const r = routeOnCicloviaNetwork(ciclovias, routePoints);
+        if (!cancelled) {
+          setRouteLinePositions(r.positions);
+          setRouteDistanceM(r.distanceMeters);
+          setRouteDurationS(r.durationSeconds);
+        }
+      } catch (e: unknown) {
+        if (!cancelled) {
+          setRouteLinePositions(null);
+          setRouteDistanceM(null);
+          setRouteDurationS(null);
+          setRouteError(e instanceof Error ? e.message : "Não foi possível calcular a rota na rede IPPUC.");
+        }
+      } finally {
+        if (!cancelled) setRouteLoading(false);
+      }
+      return () => {
+        cancelled = true;
+      };
+    }
+
     fetchOsrmRoute(routePoints)
       .then((r) => {
         if (cancelled) return;
@@ -237,7 +266,7 @@ const Index = () => {
     return () => {
       cancelled = true;
     };
-  }, [routePoints]);
+  }, [routePoints, routeNetworkMode, ciclovias]);
 
   useEffect(() => {
     if (!routeLinePositions?.length) {
@@ -387,6 +416,17 @@ const Index = () => {
     setSafetyFilter(decodeSafetyFilter(seg));
     setBaseLayer(parseBaseLayer(map));
 
+    const rnetRaw = searchParams.get("rnet");
+    const hasLegacySharedRoute =
+      (routeParam != null && routeParam.length >= 2) || (!!from && !!to);
+    if (rnetRaw != null && rnetRaw !== "") {
+      setRouteNetworkMode(parseRouteNetworkMode(rnetRaw));
+    } else if (hasLegacySharedRoute) {
+      // Links antigos só tinham from/to/route — eram sempre OSRM.
+      setRouteNetworkMode("osrm");
+    } else {
+      setRouteNetworkMode("ippuc");
+    }
     if (routeParam && routeParam.length >= 2) {
       setRoutePoints(routeParam);
     } else if (from || to) {
@@ -457,6 +497,9 @@ const Index = () => {
     if (segEnc) next.set("seg", segEnc);
     const mapEnc = baseLayerToParam(baseLayer);
     if (mapEnc) next.set("map", mapEnc);
+    if (routePoints.length >= 2) {
+      next.set("rnet", encodeRouteNetworkMode(routeNetworkMode));
+    }
     setSearchParams(next, { replace: true });
   }, [
     urlReady,
@@ -466,6 +509,7 @@ const Index = () => {
     typeFilter,
     safetyFilter,
     baseLayer,
+    routeNetworkMode,
     setSearchParams,
   ]);
 
@@ -570,7 +614,10 @@ const Index = () => {
                   waypointCount: routeWaypointCount,
                   onOptimizeTrip: handleOptimizeTrip,
                   optimizeLoading: routeOptimizeLoading,
-                  canOptimizeTrip: routePoints.length >= 3 && !routeLoading,
+                  canOptimizeTrip:
+                    routeNetworkMode === "osrm" && routePoints.length >= 3 && !routeLoading,
+                  routeNetworkMode,
+                  onRouteNetworkModeChange: setRouteNetworkMode,
                   parkSuggestions,
                   distanceMeters: routeDistanceM,
                   durationSeconds: routeDurationS,

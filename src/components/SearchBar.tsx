@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Ciclovia, getTypeLabel } from "@/data/ciclovias";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import RoutePlannerPanel, { type RoutePickMode } from "@/components/RoutePlannerPanel";
+import type { RouteNetworkMode } from "@/utils/mapUrlParams";
 import type { ParkNearRouteSuggestion } from "@/utils/parksNearRoute";
 import RouteElevationChart from "@/components/RouteElevationChart";
 import { RouteSummaryFields, routeSummaryIsActive } from "@/components/RouteSummaryStrip";
@@ -35,6 +36,8 @@ export interface SearchBarRouteProps {
   elevationLoading: boolean;
   elevationError: string | null;
   elevationData: ElevationProfilePoint[] | null;
+  routeNetworkMode: RouteNetworkMode;
+  onRouteNetworkModeChange: (mode: RouteNetworkMode) => void;
 }
 
 interface SearchBarProps {
@@ -173,6 +176,8 @@ const SearchBar = ({
                 canOptimizeTrip={route.canOptimizeTrip}
                 onOptimizeTrip={route.onOptimizeTrip}
                 optimizeLoading={route.optimizeLoading}
+                routeNetworkMode={route.routeNetworkMode}
+                onRouteNetworkModeChange={route.onRouteNetworkModeChange}
               />
               <div className="border-t border-border/50 pt-3 space-y-2">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Resumo</p>

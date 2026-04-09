@@ -1,6 +1,21 @@
 import type { LatLngTuple } from "leaflet";
 import type { Ciclovia } from "@/data/ciclovias";
 
+/** Rota calculada por OSRM (rede viária) ou apenas pela rede IPPUC desenhada no mapa. */
+export type RouteNetworkMode = "osrm" | "ippuc";
+
+/** `i` = rede IPPUC; `o` = OSRM (explícito em URLs com rota). */
+export function parseRouteNetworkMode(raw: string | null): RouteNetworkMode {
+  if (raw === "i" || raw === "ippuc") return "ippuc";
+  if (raw === "o" || raw === "osrm") return "osrm";
+  return "osrm";
+}
+
+/** Compacto para `rnet`: sempre `i` ou `o` quando a rota é serializada na URL. */
+export function encodeRouteNetworkMode(mode: RouteNetworkMode): "i" | "o" {
+  return mode === "ippuc" ? "i" : "o";
+}
+
 export type BaseLayerId = "dark" | "light" | "satellite";
 
 /** Precisão ~1 m; compacta para URLs compartilháveis. */
