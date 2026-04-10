@@ -24,7 +24,7 @@ import { loadCiclovias } from "@/services/cicloviasSource";
 import { fetchCuritibaWeather } from "@/services/weather";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useFavoriteCiclovias } from "@/hooks/useFavoriteCiclovias";
-import { fetchOsrmRoute, fetchOsrmTripRoute } from "@/services/routing";
+import { fetchOsrmRoutes, fetchOsrmTripRoute, type OsrmRouteResult } from "@/services/routing";
 import { routeOnCicloviaNetwork, type OffNetworkSegment } from "@/utils/cicloviaNetworkRoute";
 import { fetchCuritibaParksGeoJson, MIN_LARGE_PARK_AREA_M2 } from "@/services/parksOverpass";
 import { suggestParksNearRoute } from "@/utils/parksNearRoute";
@@ -126,15 +126,31 @@ const Index = () => {
   const [routePickMode, setRoutePickMode] = useState<RoutePickMode>("none");
   const [routeOptimizeLoading, setRouteOptimizeLoading] = useState(false);
   const [routeNetworkMode, setRouteNetworkMode] = useState<RouteNetworkMode>("ippuc");
-  const [routeLinePositions, setRouteLinePositions] = useState<LatLngTuple[] | null>(null);
+  const [routeOptions, setRouteOptions] = useState<OsrmRouteResult[]>([]);
+  const [selectedRouteOptionIndex, setSelectedRouteOptionIndex] = useState(0);
   const [routeOffNetworkSegments, setRouteOffNetworkSegments] = useState<OffNetworkSegment[]>([]);
-  const [routeDistanceM, setRouteDistanceM] = useState<number | null>(null);
-  const [routeDurationS, setRouteDurationS] = useState<number | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
   const [elevationData, setElevationData] = useState<ElevationProfilePoint[] | null>(null);
   const [elevationLoading, setElevationLoading] = useState(false);
   const [elevationError, setElevationError] = useState<string | null>(null);
+
+  const activeRouteOption = useMemo(() => {
+    if (routeOptions.length === 0) return null;
+    const i = Math.min(selectedRouteOptionIndex, routeOptions.length - 1);
+    return routeOptions[i] ?? null;
+  }, [routeOptions, selectedRouteOptionIndex]);
+
+  const routeLinePositions = activeRouteOption?.positions ?? null;
+  const routeDistanceM = activeRouteOption?.distanceMeters ?? null;
+  const routeDurationS = activeRouteOption?.durationSeconds ?? null;
+
+  useEffect(() => {
+    if (routeOptions.length === 0) return;
+    if (selectedRouteOptionIndex >= routeOptions.length) {
+      setSelectedRouteOptionIndex(routeOptions.length - 1);
+    }
+  }, [routeOptions.length, routeOptions, selectedRouteOptionIndex]);
 
   const handleRouteMapClick = useCallback(
     (p: LatLngTuple) => {
@@ -210,10 +226,9 @@ const Index = () => {
   const clearRoute = useCallback(() => {
     setRoutePoints([]);
     setRouteLabels([]);
-    setRouteLinePositions(null);
+    setRouteOptions([]);
+    setSelectedRouteOptionIndex(0);
     setRouteOffNetworkSegments([]);
-    setRouteDistanceM(null);
-    setRouteDurationS(null);
     setRouteError(null);
     setRoutePickMode("none");
     setRouteLoading(false);
@@ -266,10 +281,9 @@ const Index = () => {
 
   useEffect(() => {
     if (routePoints.length < 2) {
-      setRouteLinePositions(null);
+      setRouteOptions([]);
+      setSelectedRouteOptionIndex(0);
       setRouteOffNetworkSegments([]);
-      setRouteDistanceM(null);
-      setRouteDurationS(null);
       setRouteError(null);
       setRouteLoading(false);
       return;
@@ -282,17 +296,21 @@ const Index = () => {
       try {
         const r = routeOnCicloviaNetwork(ciclovias, routePoints);
         if (!cancelled) {
-          setRouteLinePositions(r.positions);
+          setRouteOptions([
+            {
+              positions: r.positions,
+              distanceMeters: r.distanceMeters,
+              durationSeconds: r.durationSeconds,
+            },
+          ]);
+          setSelectedRouteOptionIndex(0);
           setRouteOffNetworkSegments(r.offNetworkSegments);
-          setRouteDistanceM(r.distanceMeters);
-          setRouteDurationS(r.durationSeconds);
         }
       } catch (e: unknown) {
         if (!cancelled) {
-          setRouteLinePositions(null);
+          setRouteOptions([]);
+          setSelectedRouteOptionIndex(0);
           setRouteOffNetworkSegments([]);
-          setRouteDistanceM(null);
-          setRouteDurationS(null);
           setRouteError(e instanceof Error ? e.message : "Não foi possível calcular a rota na rede IPPUC.");
         }
       } finally {
@@ -304,18 +322,16 @@ const Index = () => {
     }
 
     setRouteOffNetworkSegments([]);
-    fetchOsrmRoute(routePoints)
-      .then((r) => {
+    fetchOsrmRoutes(routePoints)
+      .then((routes) => {
         if (cancelled) return;
-        setRouteLinePositions(r.positions);
-        setRouteDistanceM(r.distanceMeters);
-        setRouteDurationS(r.durationSeconds);
+        setRouteOptions(routes);
+        setSelectedRouteOptionIndex(0);
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        setRouteLinePositions(null);
-        setRouteDistanceM(null);
-        setRouteDurationS(null);
+        setRouteOptions([]);
+        setSelectedRouteOptionIndex(0);
         setRouteError(e instanceof Error ? e.message : "Não foi possível calcular a rota.");
       })
       .finally(() => {
@@ -645,6 +661,12 @@ const Index = () => {
           onRouteMapClick={handleRouteMapClick}
           showRouteLine={routePickMode === "none"}
           routeLinePositions={routeLinePositions}
+          routeLineAlternatives={
+            routeNetworkMode === "osrm" && routeOptions.length > 1
+              ? routeOptions.map((o) => o.positions)
+              : undefined
+          }
+          selectedRouteAlternativeIndex={selectedRouteOptionIndex}
           routeOffNetworkSegments={routeNetworkMode === "ippuc" ? routeOffNetworkSegments : undefined}
           routePoints={routePoints}
           onRoutePointDragEnd={handleRoutePointDragEnd}
@@ -896,6 +918,16 @@ const Index = () => {
             elevationError={elevationError}
             elevationData={elevationData}
             onClear={clearRoute}
+            routeAlternatives={
+              routeNetworkMode === "osrm" && routeOptions.length > 1
+                ? routeOptions.map((o) => ({
+                    distanceMeters: o.distanceMeters,
+                    durationSeconds: o.durationSeconds,
+                  }))
+                : null
+            }
+            selectedRouteAlternativeIndex={selectedRouteOptionIndex}
+            onSelectRouteAlternative={setSelectedRouteOptionIndex}
           />
         </div>
       )}

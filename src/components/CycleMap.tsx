@@ -196,6 +196,9 @@ interface CycleMapProps {
   /** Quando false, não desenha a polyline calculada (ex.: modo de escolher ponto no mapa). */
   showRouteLine?: boolean;
   routeLinePositions?: LatLngTuple[] | null;
+  /** Rotas alternativas (ex.: OSRM); a ativa é `routeLinePositions` / `selectedRouteAlternativeIndex`. */
+  routeLineAlternatives?: LatLngTuple[][] | null;
+  selectedRouteAlternativeIndex?: number;
   /** Trechos estimados fora da rede IPPUC (reta usuário → rede). */
   routeOffNetworkSegments?: { a: LatLngTuple; b: LatLngTuple }[];
   /** Ordem: origem, paradas opcionais, destino. */
@@ -219,6 +222,8 @@ const CycleMap = ({
   onRouteMapClick,
   showRouteLine = true,
   routeLinePositions = null,
+  routeLineAlternatives = null,
+  selectedRouteAlternativeIndex = 0,
   routeOffNetworkSegments,
   routePoints = [],
   onRoutePointDragEnd,
@@ -338,13 +343,32 @@ const CycleMap = ({
             />
           ))
         : null}
+      {showRouteLine &&
+        routeLineAlternatives &&
+        routeLineAlternatives.length > 1 &&
+        routeLineAlternatives.map((positions, i) =>
+          i !== selectedRouteAlternativeIndex && positions.length >= 2 ? (
+            <Polyline
+              key={`route-alt-${i}`}
+              positions={positions}
+              pathOptions={{
+                color: "#6366f1",
+                weight: 4,
+                opacity: 0.38,
+                dashArray: "8 10",
+                lineCap: "round",
+                lineJoin: "round",
+              }}
+            />
+          ) : null,
+        )}
       {showRouteLine && routeLinePositions && routeLinePositions.length >= 2 && (
         <Polyline
           positions={routeLinePositions}
           pathOptions={{
             color: "#6366f1",
             weight: 5,
-            opacity: 0.88,
+            opacity: 0.92,
             lineCap: "round",
             lineJoin: "round",
           }}

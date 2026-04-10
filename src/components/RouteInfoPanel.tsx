@@ -1,6 +1,8 @@
 import { Route, MapPin, Clock, GitBranch, Loader2, TrendingUp, TrendingDown, Trash2 } from "lucide-react";
 import type { RouteNetworkMode } from "@/utils/mapUrlParams";
 import type { ElevationProfilePoint } from "@/services/elevation";
+import { cn } from "@/lib/utils";
+
 export interface RouteInfoPanelProps {
   labelA: string | null;
   labelB: string | null;
@@ -14,6 +16,10 @@ export interface RouteInfoPanelProps {
   elevationData?: ElevationProfilePoint[] | null;
   /** Limpa rota, marcadores e resumo (mapa + URL). */
   onClear: () => void;
+  /** Só modo OSRM A→B: várias rotas do servidor (estilo Waze). */
+  routeAlternatives?: { distanceMeters: number; durationSeconds: number }[] | null;
+  selectedRouteAlternativeIndex?: number;
+  onSelectRouteAlternative?: (index: number) => void;
 }
 
 function elevationRangeM(data: ElevationProfilePoint[]): { min: number; max: number } | null {
@@ -40,6 +46,9 @@ const RouteInfoPanel = ({
   elevationError = null,
   elevationData = null,
   onClear,
+  routeAlternatives = null,
+  selectedRouteAlternativeIndex = 0,
+  onSelectRouteAlternative,
 }: RouteInfoPanelProps) => {
   const km = distanceMeters / 1000;
   const minRounded = Math.round(durationSeconds / 60);
@@ -71,6 +80,40 @@ const RouteInfoPanel = ({
           Limpar
         </button>
       </div>
+
+      {routeAlternatives &&
+        routeAlternatives.length > 1 &&
+        onSelectRouteAlternative &&
+        routeNetworkMode === "osrm" && (
+          <div
+            className="flex flex-wrap gap-1.5 mb-2 md:mb-3"
+            role="tablist"
+            aria-label="Escolher rota alternativa"
+          >
+            {routeAlternatives.map((alt, i) => {
+              const sel = selectedRouteAlternativeIndex === i;
+              const kmAlt = alt.distanceMeters / 1000;
+              const minAlt = Math.round(alt.durationSeconds / 60);
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  role="tab"
+                  aria-selected={sel}
+                  onClick={() => onSelectRouteAlternative(i)}
+                  className={cn(
+                    "rounded-md border px-2 py-1 text-[10px] font-medium transition-colors tabular-nums",
+                    sel
+                      ? "border-primary bg-primary/15 text-primary"
+                      : "border-border/60 bg-background/40 text-muted-foreground hover:text-foreground hover:bg-secondary/40",
+                  )}
+                >
+                  Rota {i + 1} · {kmAlt.toFixed(1)} km · ~{minAlt} min
+                </button>
+              );
+            })}
+          </div>
+        )}
 
       <div className="flex items-center gap-2 md:gap-3 mb-3 md:mb-4">
         <Route className="w-6 h-6 md:w-8 md:h-8 text-primary shrink-0" aria-hidden />
@@ -119,6 +162,10 @@ const RouteInfoPanel = ({
 
       <p className="text-[10px] text-muted-foreground/90 leading-snug border-t border-border/40 pt-2 md:pt-3">
         {modeLabel}
+        {routeNetworkMode === "osrm" &&
+          routeAlternatives &&
+          routeAlternatives.length > 1 &&
+          " — linhas tracejadas: outras opções."}
       </p>
 
       {routeNetworkMode === "ippuc" && hasIppucOffNetworkConnectors && (

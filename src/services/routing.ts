@@ -65,18 +65,21 @@ export type OsrmRoutingOptions = {
 };
 
 /**
- * Rota viária passando por todos os pontos, na ordem informada (OSRM Route).
+ * Uma ou mais rotas viárias (OSRM Route). Com **apenas origem e destino** pede até 3 alternativas
+ * (`alternatives`), estilo apps de navegação. Com paradas intermediárias, o servidor costuma devolver uma única rota.
  */
-export async function fetchOsrmRoute(
+export async function fetchOsrmRoutes(
   waypoints: LatLngTuple[],
   options?: OsrmRoutingOptions,
-): Promise<OsrmRouteResult> {
+): Promise<OsrmRouteResult[]> {
   if (waypoints.length < 2) {
     throw new Error("São necessários pelo menos dois pontos.");
   }
   const profile = resolveOsrmProfile(options);
   const path = coordsPath(waypoints);
-  const url = `${osrmBaseUrl()}/route/v1/${profile}/${path}?overview=full&geometries=geojson`;
+  const onlyAtoB = waypoints.length === 2;
+  const altQs = onlyAtoB ? "&alternatives=3" : "";
+  const url = `${osrmBaseUrl()}/route/v1/${profile}/${path}?overview=full&geometries=geojson${altQs}`;
 
   const res = await fetch(url);
   const data = (await res.json()) as OsrmGeometryResponse;
@@ -89,18 +92,27 @@ export async function fetchOsrmRoute(
     throw new Error(`OSRM: ${detail}`);
   }
 
-  if (data.code !== "Ok" || !data.routes?.[0]) {
+  if (data.code !== "Ok" || !data.routes?.length) {
     throw new Error(osrmErrorMessage(data.code, data.message));
   }
 
-  const route = data.routes[0];
-  const positions = geometryToPositions(route);
-
-  return {
-    positions,
+  return data.routes.map((route) => ({
+    positions: geometryToPositions(route),
     distanceMeters: route.distance,
     durationSeconds: route.duration,
-  };
+  }));
+}
+
+/**
+ * Rota viária passando por todos os pontos, na ordem informada (OSRM Route).
+ * Equivalente à primeira opção de {@link fetchOsrmRoutes}.
+ */
+export async function fetchOsrmRoute(
+  waypoints: LatLngTuple[],
+  options?: OsrmRoutingOptions,
+): Promise<OsrmRouteResult> {
+  const routes = await fetchOsrmRoutes(waypoints, options);
+  return routes[0];
 }
 
 interface OsrmTripResponse {
