@@ -1,4 +1,5 @@
 import type { LatLngTuple } from "leaflet";
+import { nominatimBase } from "@/lib/apiConfig";
 
 const cache = new Map<string, string>();
 
@@ -19,11 +20,6 @@ interface NominatimAddr {
 interface NominatimReverse {
   display_name?: string;
   address?: NominatimAddr;
-}
-
-function nominatimBase(): string {
-  const fromEnv = import.meta.env.VITE_NOMINATIM_URL?.replace(/\/$/, "");
-  return fromEnv && fromEnv.length > 0 ? fromEnv : "/nominatim";
 }
 
 function shortLabel(data: NominatimReverse): string {

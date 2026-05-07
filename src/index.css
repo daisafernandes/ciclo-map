@@ -89,6 +89,18 @@
     @apply text-sm tracking-tight;
   }
 
+  .label-xs {
+    @apply text-[10px] text-muted-foreground uppercase tracking-wider;
+  }
+
+  .label-muted {
+    @apply text-xs text-muted-foreground/90 leading-snug;
+  }
+
+  .stat-value {
+    @apply text-xs font-medium text-foreground;
+  }
+
   /**
    * Mapa base claro (Carto light): texto escuro em fundos sólidos, sem vidro escuro sobre
    * tiles claros — melhora legibilidade em clima, legenda e barra superior.

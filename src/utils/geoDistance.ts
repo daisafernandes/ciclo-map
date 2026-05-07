@@ -1,4 +1,4 @@
-import type { LatLngTuple } from "leaflet";
+import type { LatLngExpression, LatLngTuple } from "leaflet";
 
 const R = 6371000;
 
@@ -50,6 +50,14 @@ export function projectPointOnChordSegment(
   t = Math.max(0, Math.min(1, t));
   const point: LatLngTuple = [lat1 + t * dy, lng1 + t * dx];
   return { point, distM: haversineM(p, point) };
+}
+
+/** Converte LatLngExpression (array ou objeto) para LatLngTuple. */
+export function toLatLngTuple(c: LatLngExpression): LatLngTuple {
+  if (Array.isArray(c) && c.length >= 2) return [Number(c[0]), Number(c[1])];
+  const o = c as { lat?: number; lng?: number };
+  if (typeof o.lat === "number" && typeof o.lng === "number") return [o.lat, o.lng];
+  return [0, 0];
 }
 
 export function distPointToPolylineM(p: LatLngTuple, line: LatLngTuple[]): number {

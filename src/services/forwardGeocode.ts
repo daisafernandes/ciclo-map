@@ -1,9 +1,5 @@
 import type { LatLngTuple } from "leaflet";
-
-function nominatimBase(): string {
-  const fromEnv = import.meta.env.VITE_NOMINATIM_URL?.replace(/\/$/, "");
-  return fromEnv && fromEnv.length > 0 ? fromEnv : "/nominatim";
-}
+import { nominatimBase } from "@/lib/apiConfig";
 
 /** min_lon, max_lat, max_lon, min_lat — Curitiba e entorno. */
 const CURITIBA_VIEWBOX = "-49.42,-25.38,-49.18,-25.55";

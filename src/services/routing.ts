@@ -1,16 +1,11 @@
 import type { LatLngTuple } from "leaflet";
+import { osrmBase } from "@/lib/apiConfig";
 
 export interface OsrmRouteResult {
   /** Posições [lat, lng] para Leaflet. */
   positions: LatLngTuple[];
   distanceMeters: number;
   durationSeconds: number;
-}
-
-function osrmBaseUrl(): string {
-  const fromEnv = import.meta.env.VITE_OSRM_URL?.trim();
-  if (fromEnv) return fromEnv.replace(/\/$/, "");
-  return "/osrm";
 }
 
 /** Perfil fixo do app nos pedidos OSRM (rede para bicicleta em dados OSM). */
@@ -79,7 +74,7 @@ export async function fetchOsrmRoutes(
   const path = coordsPath(waypoints);
   const onlyAtoB = waypoints.length === 2;
   const altQs = onlyAtoB ? "&alternatives=3" : "";
-  const url = `${osrmBaseUrl()}/route/v1/${profile}/${path}?overview=full&geometries=geojson${altQs}`;
+  const url = `${osrmBase()}/route/v1/${profile}/${path}?overview=full&geometries=geojson${altQs}`;
 
   const res = await fetch(url);
   const data = (await res.json()) as OsrmGeometryResponse;
@@ -139,7 +134,7 @@ export async function fetchOsrmTripRoute(
   }
   const profile = resolveOsrmProfile(options);
   const path = coordsPath(waypoints);
-  const url = `${osrmBaseUrl()}/trip/v1/${profile}/${path}?overview=full&geometries=geojson&roundtrip=false&source=first&destination=last`;
+  const url = `${osrmBase()}/trip/v1/${profile}/${path}?overview=full&geometries=geojson&roundtrip=false&source=first&destination=last`;
 
   const res = await fetch(url);
   const data = (await res.json()) as OsrmTripResponse;

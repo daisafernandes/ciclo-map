@@ -1,18 +1,6 @@
 import type { LatLngTuple } from "leaflet";
-
-const R = 6371000;
-
-function haversineM(a: LatLngTuple, b: LatLngTuple): number {
-  const [lat1, lon1] = a;
-  const [lat2, lon2] = b;
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const x =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.asin(Math.min(1, Math.sqrt(x)));
-}
+import { haversineM } from "@/utils/geoDistance";
+import { elevationBase } from "@/lib/apiConfig";
 
 /** Amostra ao longo da polyline para não exceder limites da API. */
 export function sampleRoutePositions(positions: LatLngTuple[], maxPoints: number): LatLngTuple[] {
@@ -48,9 +36,7 @@ export async function fetchElevationProfile(
     distM.push(distM[i - 1] + haversineM(samples[i - 1], samples[i]));
   }
 
-  const base =
-    import.meta.env.VITE_ELEVATION_URL?.trim().replace(/\/$/, "") ||
-    "https://api.open-elevation.com/api/v1/lookup";
+  const base = elevationBase();
 
   const res = await fetch(base, {
     method: "POST",

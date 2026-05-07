@@ -15,13 +15,7 @@ import RouteElevationChart from "@/components/RouteElevationChart";
 import { RouteSummaryFields, routeSummaryIsActive } from "@/components/RouteSummaryStrip";
 import type { ElevationProfilePoint } from "@/services/elevation";
 import { cn } from "@/lib/utils";
-
-function normalizeSearch(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "");
-}
+import { normalizeText } from "@/utils/geoFormat";
 
 export interface SearchBarRouteProps {
   pickMode: RoutePickMode;
@@ -100,9 +94,9 @@ const SearchBar = ({
     if (q.length === 0) {
       return { neighborhoodRows: [] as { name: string; list: Ciclovia[] }[], cicloviaRows: [] as Ciclovia[] };
     }
-    const nq = normalizeSearch(q);
+    const nq = normalizeText(q);
 
-    const matchesText = (text: string) => normalizeSearch(text).includes(nq);
+    const matchesText = (text: string) => normalizeText(text).includes(nq);
 
     const byNeighborhood = new Map<string, Ciclovia[]>();
     for (const c of ciclovias) {

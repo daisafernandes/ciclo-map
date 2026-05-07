@@ -7,6 +7,13 @@ import { LatLngExpression } from "leaflet";
 
 export type CicloviaDataSource = "static" | "live";
 
+/** Cor hex por nível de segurança — fonte única para mapa e painéis. */
+export const SAFETY_COLORS: Record<"safe" | "moderate" | "caution", string> = {
+  safe: "#22c55e",
+  moderate: "#eab308",
+  caution: "#ef4444",
+};
+
 export interface Ciclovia {
   id: string;
   name: string;

@@ -1,7 +1,6 @@
-import type { LatLngTuple } from "leaflet";
-import type { LatLngExpression } from "leaflet";
+import type { LatLngTuple, LatLngExpression } from "leaflet";
 import type { Ciclovia } from "@/data/ciclovias";
-import { haversineM, projectPointOnChordSegment } from "@/utils/geoDistance";
+import { haversineM, projectPointOnChordSegment, toLatLngTuple } from "@/utils/geoDistance";
 
 /** Trecho reta entre o ponto do usuário e o encosto na rede (visualização tracejada). */
 export interface OffNetworkSegment {
@@ -16,17 +15,6 @@ export interface CicloviaNetworkRouteResult {
   durationSeconds: number;
   /** Conectores fora da rede (usuário → snap), para desenho tracejado quando o encosto está além do limiar. */
   offNetworkSegments: OffNetworkSegment[];
-}
-
-function toTuple(c: LatLngExpression): LatLngTuple {
-  if (Array.isArray(c) && c.length >= 2) {
-    return [Number(c[0]), Number(c[1])];
-  }
-  const o = c as { lat?: number; lng?: number };
-  if (typeof o.lat === "number" && typeof o.lng === "number") {
-    return [o.lat, o.lng];
-  }
-  return [0, 0];
 }
 
 const GRID = 0.00022;
@@ -204,8 +192,8 @@ function buildGraph(
     const coords = c.coordinates;
     if (!coords || coords.length < 2) continue;
     for (let i = 0; i < coords.length - 1; i++) {
-      const pa = toTuple(coords[i]);
-      const pb = toTuple(coords[i + 1]);
+      const pa = toLatLngTuple(coords[i]);
+      const pb = toLatLngTuple(coords[i + 1]);
       const u = getOrCreateNode(pa);
       const v = getOrCreateNode(pb);
       const w = haversineM(nodes[u], nodes[v]);

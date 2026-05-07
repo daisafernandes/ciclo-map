@@ -13,7 +13,7 @@ import {
 } from "react-leaflet";
 import L, { LatLngExpression, type LatLngTuple } from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { Ciclovia, getSafetyLabel, getTypeLabel } from "@/data/ciclovias";
+import { Ciclovia, getSafetyLabel, getTypeLabel, SAFETY_COLORS } from "@/data/ciclovias";
 import ParksOverlay from "@/components/ParksOverlay";
 import { flattenBoundsPoints } from "@/utils/mapBounds";
 import type { BaseLayerId } from "@/utils/mapUrlParams";
@@ -40,11 +40,6 @@ const BASE_LAYERS: Record<
   },
 };
 
-const safetyColors = {
-  safe: "#22c55e",
-  moderate: "#eab308",
-  caution: "#ef4444",
-};
 
 const typeStyles = {
   ciclovia: { weight: 5, opacity: 0.9, dashArray: undefined },
@@ -292,7 +287,7 @@ const CycleMap = ({
             interactive={cicloviasInteractive}
             positions={ciclovia.coordinates}
             pathOptions={{
-              color: isSelected ? "#14b8a6" : safetyColors[ciclovia.safety],
+              color: isSelected ? "#14b8a6" : SAFETY_COLORS[ciclovia.safety],
               weight: isSelected ? style.weight + 2 : style.weight,
               opacity: isSelected ? 1 : style.opacity,
               dashArray: style.dashArray,
@@ -310,8 +305,8 @@ const CycleMap = ({
                     {getTypeLabel(ciclovia.type, ciclovia.tipoLabelIppuc)}
                   </span>
                   <span className={`px-2 py-0.5 rounded-full`} style={{
-                    backgroundColor: safetyColors[ciclovia.safety] + "20",
-                    color: safetyColors[ciclovia.safety],
+                    backgroundColor: SAFETY_COLORS[ciclovia.safety] + "20",
+                    color: SAFETY_COLORS[ciclovia.safety],
                   }}>
                     {safety.label}
                   </span>

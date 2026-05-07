@@ -1,8 +1,9 @@
 import area from "@turf/area";
 import osmtogeojson from "osmtogeojson";
 import type { Feature, FeatureCollection, Geometry, MultiPolygon, Polygon } from "geojson";
+import { overpassBase } from "@/lib/apiConfig";
 
-/** Área mínima em m² para contar como “parque grande” (~9 ha). Praças e ilhéus pequenos ficam de fora. */
+/** Área mínima em m² para contar como "parque grande" (~9 ha). Praças e ilhéus pequenos ficam de fora. */
 export const MIN_LARGE_PARK_AREA_M2 = 90_000;
 
 /** Área aproximada de Curitiba (WGS84) para consulta de parques no OSM. */
@@ -12,13 +13,6 @@ export const CURITIBA_PARKS_BBOX = {
   north: -25.25,
   east: -48.98,
 } as const;
-
-function overpassUrl(): string {
-  const fromEnv = import.meta.env.VITE_OVERPASS_URL?.trim();
-  if (fromEnv) return fromEnv;
-  if (import.meta.env.DEV) return "/overpass-api/api/interpreter";
-  return "https://overpass-api.de/api/interpreter";
-}
 
 function filterLargeParksOnly(fc: FeatureCollection<Geometry>): FeatureCollection<Geometry> {
   const features = fc.features.filter((f) => {
@@ -46,7 +40,7 @@ export async function fetchCuritibaParksGeoJson(): Promise<FeatureCollection<Geo
 out geom;
 `;
 
-  const res = await fetch(overpassUrl(), {
+  const res = await fetch(overpassBase(), {
     method: "POST",
     body: `data=${encodeURIComponent(query)}`,
     headers: { "Content-Type": "application/x-www-form-urlencoded" },

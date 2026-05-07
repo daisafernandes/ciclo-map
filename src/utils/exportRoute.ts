@@ -1,36 +1,19 @@
 import type { LatLngExpression } from "leaflet";
 import type { Feature, LineString } from "geojson";
 import type { Ciclovia } from "@/data/ciclovias";
+import { toLatLngTuple } from "@/utils/geoDistance";
+import { normalizeText } from "@/utils/geoFormat";
 
 /** Slug seguro para nome de arquivo (nome ou id). */
 export function routeFileSlug(ciclovia: Ciclovia): string {
   const base = ciclovia.name?.trim() || ciclovia.id;
-  const slug = base
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
+  const slug = normalizeText(base).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   return slug || `trecho-${ciclovia.id}`;
-}
-
-function toTuple(p: LatLngExpression): [number, number] | null {
-  if (Array.isArray(p) && p.length >= 2) {
-    const a = p[0];
-    const b = p[1];
-    if (typeof a === "number" && typeof b === "number") return [a, b];
-  }
-  return null;
 }
 
 /** Coordenadas como tuplas [lat, lng] na ordem do mapa. */
 export function cicloviaLineLatLng(ciclovia: Ciclovia): [number, number][] {
-  const out: [number, number][] = [];
-  for (const p of ciclovia.coordinates) {
-    const t = toTuple(p);
-    if (t) out.push(t);
-  }
-  return out;
+  return ciclovia.coordinates.map((p) => toLatLngTuple(p as LatLngExpression));
 }
 
 /** GeoJSON LineString (RFC 7946: [lng, lat]). */
