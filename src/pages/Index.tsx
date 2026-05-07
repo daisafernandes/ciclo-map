@@ -93,6 +93,7 @@ const Index = () => {
   const neighborhoodFitSeq = useRef(0);
   const [neighborhoodName, setNeighborhoodName] = useState<string | null>(null);
   const [parksVisible, setParksVisible] = useState(false);
+  const [bikeStationsVisible, setBikeStationsVisible] = useState(false);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [typeFilter, setTypeFilter] = useState(defaultTypeFilter);
   const [safetyFilter, setSafetyFilter] = useState(defaultSafetyFilter);
@@ -650,6 +651,7 @@ const Index = () => {
         <CycleMap
           ciclovias={visibleCiclovias}
           showParks={parksVisible}
+          showBikeStations={bikeStationsVisible}
           selectedId={selectedCiclovia?.id ?? null}
           highlightedIds={mapHighlightIds}
           onSelect={handleSelectCiclovia}
@@ -759,6 +761,8 @@ const Index = () => {
                 onBaseLayerChange={setBaseLayer}
                 parksVisible={parksVisible}
                 onParksVisibleChange={setParksVisible}
+                bikeStationsVisible={bikeStationsVisible}
+                onBikeStationsVisibleChange={setBikeStationsVisible}
                 typeFilter={typeFilter}
                 onToggleType={toggleTypeFilter}
                 safetyFilter={safetyFilter}
@@ -928,6 +932,7 @@ const Index = () => {
             }
             selectedRouteAlternativeIndex={selectedRouteOptionIndex}
             onSelectRouteAlternative={setSelectedRouteOptionIndex}
+            weatherData={weatherData}
           />
         </div>
       )}
@@ -995,6 +1000,8 @@ const Index = () => {
                 onBaseLayerChange={setBaseLayer}
                 parksVisible={parksVisible}
                 onParksVisibleChange={setParksVisible}
+                bikeStationsVisible={bikeStationsVisible}
+                onBikeStationsVisibleChange={setBikeStationsVisible}
                 typeFilter={typeFilter}
                 onToggleType={toggleTypeFilter}
                 safetyFilter={safetyFilter}

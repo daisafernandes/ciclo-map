@@ -15,6 +15,7 @@ import L, { LatLngExpression, type LatLngTuple } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Ciclovia, getSafetyLabel, getTypeLabel, SAFETY_COLORS } from "@/data/ciclovias";
 import ParksOverlay from "@/components/ParksOverlay";
+import BikeStationsOverlay from "@/components/BikeStationsOverlay";
 import { flattenBoundsPoints } from "@/utils/mapBounds";
 import type { BaseLayerId } from "@/utils/mapUrlParams";
 import type { RoutePickMode } from "@/components/RoutePlannerPanel";
@@ -174,6 +175,7 @@ interface CycleMapProps {
   ciclovias: Ciclovia[];
   /** Polígonos de parques OSM (só quando true). */
   showParks?: boolean;
+  showBikeStations?: boolean;
   selectedId: string | null;
   /** Quando definido (ex.: busca por bairro), destaca vários trechos. Se vazio, usa só `selectedId`. */
   highlightedIds?: string[] | null;
@@ -206,6 +208,7 @@ interface CycleMapProps {
 const CycleMap = ({
   ciclovias,
   showParks = false,
+  showBikeStations = false,
   selectedId,
   highlightedIds = null,
   onSelect,
@@ -240,6 +243,7 @@ const CycleMap = ({
       <ZoomControl position="bottomright" />
       <TileLayer key={baseLayer} attribution={tile.attribution} url={tile.url} />
       {showParks ? <ParksOverlay /> : null}
+      {showBikeStations ? <BikeStationsOverlay /> : null}
       {onRouteMapClick ? (
         <RouteMapClickHandler pickMode={routePickMode} onMapClick={onRouteMapClick} />
       ) : null}

@@ -29,6 +29,8 @@ interface MapLayerFiltersPopoverProps {
   onBaseLayerChange: (id: BaseLayerId) => void;
   parksVisible: boolean;
   onParksVisibleChange: (value: boolean) => void;
+  bikeStationsVisible: boolean;
+  onBikeStationsVisibleChange: (value: boolean) => void;
   typeFilter: Record<Ciclovia["type"], boolean>;
   onToggleType: (key: Ciclovia["type"]) => void;
   safetyFilter: Record<Ciclovia["safety"], boolean>;
@@ -43,6 +45,8 @@ export default function MapLayerFiltersPopover({
   onBaseLayerChange,
   parksVisible,
   onParksVisibleChange,
+  bikeStationsVisible,
+  onBikeStationsVisibleChange,
   typeFilter,
   onToggleType,
   safetyFilter,
@@ -113,6 +117,19 @@ export default function MapLayerFiltersPopover({
                     className="text-xs font-normal text-muted-foreground cursor-pointer leading-snug"
                   >
                     Exibir parques
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="popover-bike-stations"
+                    checked={bikeStationsVisible}
+                    onCheckedChange={(v) => onBikeStationsVisibleChange(v === true)}
+                  />
+                  <Label
+                    htmlFor="popover-bike-stations"
+                    className="text-xs font-normal text-muted-foreground cursor-pointer leading-snug"
+                  >
+                    Estações Bicicuritiba
                   </Label>
                 </div>
               </div>

@@ -1,6 +1,9 @@
 import { Route, MapPin, Clock, GitBranch, Loader2, TrendingUp, TrendingDown, Trash2 } from "lucide-react";
+import { useMemo } from "react";
 import type { RouteNetworkMode } from "@/utils/mapUrlParams";
 import type { ElevationProfilePoint } from "@/services/elevation";
+import type { WeatherData } from "@/data/ciclovias";
+import { calculateRouteDifficulty } from "@/utils/routeDifficultyScore";
 import { cn } from "@/lib/utils";
 
 export interface RouteInfoPanelProps {
@@ -20,6 +23,7 @@ export interface RouteInfoPanelProps {
   routeAlternatives?: { distanceMeters: number; durationSeconds: number }[] | null;
   selectedRouteAlternativeIndex?: number;
   onSelectRouteAlternative?: (index: number) => void;
+  weatherData?: WeatherData | null;
 }
 
 function elevationRangeM(data: ElevationProfilePoint[]): { min: number; max: number } | null {
@@ -49,12 +53,29 @@ const RouteInfoPanel = ({
   routeAlternatives = null,
   selectedRouteAlternativeIndex = 0,
   onSelectRouteAlternative,
+  weatherData = null,
 }: RouteInfoPanelProps) => {
   const km = distanceMeters / 1000;
   const minRounded = Math.round(durationSeconds / 60);
   const modeLabel =
     routeNetworkMode === "ippuc" ? "Rede IPPUC (ciclovias)" : "OSRM — rede viária (OSM)";
   const elevRange = elevationData?.length ? elevationRangeM(elevationData) : null;
+
+  const difficulty = useMemo(() => {
+    if (!elevationData?.length) return null;
+    return calculateRouteDifficulty({
+      elevationData,
+      distanceMeters,
+      weatherData: weatherData ?? undefined,
+      routeNetworkMode,
+    });
+  }, [elevationData, distanceMeters, weatherData, routeNetworkMode]);
+
+  const difficultyColors: Record<string, string> = {
+    "Fácil": "text-emerald-500",
+    "Moderado": "text-amber-500",
+    "Difícil": "text-red-500",
+  };
 
   return (
     <div className="glass-panel-sm p-3 md:p-4 animate-slide-up">
@@ -127,6 +148,27 @@ const RouteInfoPanel = ({
           </p>
         </div>
       </div>
+
+      {difficulty && (
+        <div className="flex items-center gap-2 mb-2 md:mb-3">
+          <span className={cn("text-xs font-semibold", difficultyColors[difficulty.level])}>
+            ● {difficulty.level}
+          </span>
+          {difficulty.elevationGainM > 5 && (
+            <span className="text-[10px] text-muted-foreground">
+              ↑ {Math.round(difficulty.elevationGainM)} m ganho
+            </span>
+          )}
+          {difficulty.factors.length > 0 && (
+            <span
+              className="text-[10px] text-muted-foreground truncate"
+              title={difficulty.factors.join(" · ")}
+            >
+              · {difficulty.factors[0]}
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="space-y-2 md:space-y-2.5 mb-2 md:mb-3">
         <div className="flex items-start gap-2">
