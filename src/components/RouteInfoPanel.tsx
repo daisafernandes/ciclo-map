@@ -1,4 +1,4 @@
-import { Route, MapPin, Clock, GitBranch, Loader2, TrendingUp, TrendingDown, Trash2 } from "lucide-react";
+import { Route, MapPin, Clock, GitBranch, Loader2, TrendingUp, TrendingDown, Trash2, Navigation } from "lucide-react";
 import { useMemo } from "react";
 import type { RouteNetworkMode } from "@/utils/mapUrlParams";
 import type { ElevationProfilePoint } from "@/services/elevation";
@@ -19,6 +19,10 @@ export interface RouteInfoPanelProps {
   elevationData?: ElevationProfilePoint[] | null;
   /** Limpa rota, marcadores e resumo (mapa + URL). */
   onClear: () => void;
+  /** Se true, há steps OSRM disponíveis para navegação. */
+  canNavigate?: boolean;
+  /** Callback para iniciar modo navegação. */
+  onStartNavigation?: () => void;
   /** Só modo OSRM A→B: várias rotas do servidor (estilo Waze). */
   routeAlternatives?: { distanceMeters: number; durationSeconds: number }[] | null;
   selectedRouteAlternativeIndex?: number;
@@ -50,6 +54,8 @@ const RouteInfoPanel = ({
   elevationError = null,
   elevationData = null,
   onClear,
+  canNavigate = false,
+  onStartNavigation,
   routeAlternatives = null,
   selectedRouteAlternativeIndex = 0,
   onSelectRouteAlternative,
@@ -91,15 +97,28 @@ const RouteInfoPanel = ({
             {routeNetworkMode === "ippuc" ? "IPPUC" : "OSRM"}
           </span>
         </div>
-        <button
-          type="button"
-          onClick={onClear}
-          className="shrink-0 inline-flex items-center gap-1 rounded-md border border-border/60 bg-background/40 px-2 py-1 text-[10px] font-medium text-muted-foreground hover:bg-destructive/15 hover:text-destructive hover:border-destructive/35 transition-colors"
-          aria-label="Limpar rota e remover marcadores do mapa"
-        >
-          <Trash2 className="w-3 h-3" aria-hidden />
-          Limpar
-        </button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {canNavigate && onStartNavigation && (
+            <button
+              type="button"
+              onClick={onStartNavigation}
+              className="inline-flex items-center gap-1 rounded-md border border-primary/50 bg-primary/10 px-2 py-1 text-[10px] font-medium text-primary hover:bg-primary/20 transition-colors"
+              aria-label="Iniciar navegação turn-by-turn"
+            >
+              <Navigation className="w-3 h-3" aria-hidden />
+              Navegar
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClear}
+            className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-background/40 px-2 py-1 text-[10px] font-medium text-muted-foreground hover:bg-destructive/15 hover:text-destructive hover:border-destructive/35 transition-colors"
+            aria-label="Limpar rota e remover marcadores do mapa"
+          >
+            <Trash2 className="w-3 h-3" aria-hidden />
+            Limpar
+          </button>
+        </div>
       </div>
 
       {routeAlternatives &&

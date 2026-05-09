@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo, useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
@@ -25,6 +25,9 @@ import { fetchCuritibaWeather } from "@/services/weather";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useFavoriteCiclovias } from "@/hooks/useFavoriteCiclovias";
 import { fetchOsrmRoutes, fetchOsrmTripRoute, type OsrmRouteResult } from "@/services/routing";
+import { useNavigation } from "@/hooks/useNavigation";
+import NavigationBanner from "@/components/NavigationBanner";
+import OfflineBanner from "@/components/OfflineBanner";
 import { routeOnCicloviaNetwork, type OffNetworkSegment } from "@/utils/cicloviaNetworkRoute";
 import { fetchCuritibaParksGeoJson, MIN_LARGE_PARK_AREA_M2 } from "@/services/parksOverpass";
 import { suggestParksNearRoute } from "@/utils/parksNearRoute";
@@ -145,6 +148,22 @@ const Index = () => {
   const routeLinePositions = activeRouteOption?.positions ?? null;
   const routeDistanceM = activeRouteOption?.distanceMeters ?? null;
   const routeDurationS = activeRouteOption?.durationSeconds ?? null;
+
+  const activeSteps = routeNetworkMode === "osrm" ? (activeRouteOption?.steps ?? undefined) : undefined;
+  const navigation = useNavigation(activeSteps, geoPosition);
+
+  const isOnline = useSyncExternalStore(
+    (cb) => {
+      window.addEventListener("online", cb);
+      window.addEventListener("offline", cb);
+      return () => {
+        window.removeEventListener("online", cb);
+        window.removeEventListener("offline", cb);
+      };
+    },
+    () => navigator.onLine,
+    () => true,
+  );
 
   useEffect(() => {
     if (routeOptions.length === 0) return;
@@ -676,6 +695,19 @@ const Index = () => {
         />
       </div>
 
+      {/* Offline banner */}
+      {!isOnline && <OfflineBanner />}
+
+      {/* Navigation banner — turn-by-turn */}
+      {navigation.isNavigating && navigation.currentStep && (
+        <NavigationBanner
+          currentStep={navigation.currentStep}
+          nextStep={navigation.nextStep}
+          distanceToNextM={navigation.distanceToNextM}
+          onStop={navigation.stopNavigation}
+        />
+      )}
+
       {/* Top Bar */}
       <div className="absolute top-0 left-0 right-0 z-10 p-4">
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 max-w-screen-xl mx-auto">
@@ -922,6 +954,8 @@ const Index = () => {
             elevationError={elevationError}
             elevationData={elevationData}
             onClear={clearRoute}
+            canNavigate={routeNetworkMode === "osrm" && (activeSteps?.length ?? 0) > 0}
+            onStartNavigation={navigation.startNavigation}
             routeAlternatives={
               routeNetworkMode === "osrm" && routeOptions.length > 1
                 ? routeOptions.map((o) => ({

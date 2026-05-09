@@ -144,9 +144,36 @@ function withStaticSource(list: Ciclovia[]): Ciclovia[] {
   return list.map((c) => ({ ...c, dataSource: "static" as const }));
 }
 
+const CICLOVIAS_CACHE_NAME = "ciclovias-geojson-v1";
+const CICLOVIAS_CACHE_KEY = "ciclovias-data-v1";
+
+async function saveCicloviasToCache(data: unknown): Promise<void> {
+  try {
+    const cache = await caches.open(CICLOVIAS_CACHE_NAME);
+    const response = new Response(JSON.stringify(data), {
+      headers: { "Content-Type": "application/json" },
+    });
+    await cache.put(CICLOVIAS_CACHE_KEY, response);
+  } catch {
+    // Cache API pode não estar disponível em contextos não-HTTPS.
+  }
+}
+
+async function loadCicloviasFromCache(): Promise<unknown | null> {
+  try {
+    const cache = await caches.open(CICLOVIAS_CACHE_NAME);
+    const res = await cache.match(CICLOVIAS_CACHE_KEY);
+    if (!res) return null;
+    return (await res.json()) as unknown;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Carrega ciclovias: estáticas por padrão; se `VITE_CICLOVIAS_LIVE_URL` estiver definida,
- * tenta GeoJSON (query ArcGIS ou arquivo). Em falha, volta ao estático.
+ * tenta GeoJSON (query ArcGIS ou arquivo). Em falha, tenta cache da Cache API,
+ * depois volta ao estático.
  */
 export async function loadCiclovias(): Promise<CicloviasLoadResult> {
   const staticWithSource = withStaticSource(staticCiclovias);
@@ -162,8 +189,22 @@ export async function loadCiclovias(): Promise<CicloviasLoadResult> {
     const data: unknown = await res.json();
     const live = geoJsonToCiclovias(data);
     if (live.length === 0) throw new Error("Nenhuma feição na resposta.");
+    // Salva no cache para uso offline futuro.
+    void saveCicloviasToCache(data);
     return { ciclovias: live, mode: "live" };
   } catch {
+    // Tenta cache offline antes de usar dados estáticos.
+    const cached = await loadCicloviasFromCache();
+    if (cached) {
+      try {
+        const fromCache = geoJsonToCiclovias(cached);
+        if (fromCache.length > 0) {
+          return { ciclovias: fromCache, mode: "static-fallback" };
+        }
+      } catch {
+        // Cache corrompido — cai no estático.
+      }
+    }
     return { ciclovias: staticWithSource, mode: "static-fallback" };
   }
 }

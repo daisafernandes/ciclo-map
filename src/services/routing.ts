@@ -1,11 +1,24 @@
 import type { LatLngTuple } from "leaflet";
 import { osrmBase } from "@/lib/apiConfig";
 
+export interface OsrmStep {
+  maneuver: {
+    type: string;
+    modifier?: string;
+    bearing_after: number;
+  };
+  name: string;
+  distance: number;
+  duration: number;
+}
+
 export interface OsrmRouteResult {
   /** Posições [lat, lng] para Leaflet. */
   positions: LatLngTuple[];
   distanceMeters: number;
   durationSeconds: number;
+  /** Steps de navegação (apenas rotas OSRM com steps=true). */
+  steps?: OsrmStep[];
 }
 
 /** Perfil fixo do app nos pedidos OSRM (rede para bicicleta em dados OSM). */
@@ -36,6 +49,13 @@ function coordsPath(waypoints: LatLngTuple[]): string {
   return waypoints.map(([lat, lon]) => `${lon},${lat}`).join(";");
 }
 
+type OsrmApiStep = {
+  maneuver: { type: string; modifier?: string; bearing_after: number };
+  name: string;
+  distance: number;
+  duration: number;
+};
+
 type OsrmGeometryResponse = {
   code?: string;
   message?: string;
@@ -43,6 +63,7 @@ type OsrmGeometryResponse = {
     distance: number;
     duration: number;
     geometry?: { type: string; coordinates?: [number, number][] };
+    legs?: Array<{ steps?: OsrmApiStep[] }>;
   }>;
 };
 
@@ -52,6 +73,25 @@ function geometryToPositions(route: NonNullable<OsrmGeometryResponse["routes"]>[
     throw new Error("Geometria da rota vazia.");
   }
   return coords.map(([lng, lat]) => [lat, lng]);
+}
+
+function extractSteps(route: NonNullable<OsrmGeometryResponse["routes"]>[0]): OsrmStep[] {
+  const steps: OsrmStep[] = [];
+  for (const leg of route.legs ?? []) {
+    for (const s of leg.steps ?? []) {
+      steps.push({
+        maneuver: {
+          type: s.maneuver.type,
+          modifier: s.maneuver.modifier,
+          bearing_after: s.maneuver.bearing_after,
+        },
+        name: s.name,
+        distance: s.distance,
+        duration: s.duration,
+      });
+    }
+  }
+  return steps;
 }
 
 export type OsrmRoutingOptions = {
@@ -74,7 +114,7 @@ export async function fetchOsrmRoutes(
   const path = coordsPath(waypoints);
   const onlyAtoB = waypoints.length === 2;
   const altQs = onlyAtoB ? "&alternatives=3" : "";
-  const url = `${osrmBase()}/route/v1/${profile}/${path}?overview=full&geometries=geojson${altQs}`;
+  const url = `${osrmBase()}/route/v1/${profile}/${path}?overview=full&geometries=geojson&steps=true${altQs}`;
 
   const res = await fetch(url);
   const data = (await res.json()) as OsrmGeometryResponse;
@@ -95,6 +135,7 @@ export async function fetchOsrmRoutes(
     positions: geometryToPositions(route),
     distanceMeters: route.distance,
     durationSeconds: route.duration,
+    steps: extractSteps(route),
   }));
 }
 
